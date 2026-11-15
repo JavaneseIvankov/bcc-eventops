@@ -1,7 +1,7 @@
 "use client"
 
 import { Controller } from "react-hook-form"
-import { cn } from "@/shared/lib/utils"
+import { cn } from "@/shared/lib/utils" // or "cn" based on your alias
 import { Button } from "@/shared/components/ui/button"
 import {
   Card,
