@@ -8,20 +8,13 @@ import { Badge } from "@/shared/components/ui/badge"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 import { Input } from "@/shared/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select"
-import {
   useCreateSession,
   useDeleteSession,
   useGetEventSessions,
   useUpdateSessionStatus,
 } from "@/shared/repository/queries"
 import type { CommitteeRole, Session, SessionStatus } from "@/shared/repository/types"
-import { formatDateTime, formatTimeRange } from "@/features/events/components/event-date"
+import { formatDateTime } from "@/features/events/components/event-date"
 
 const NEXT_STATUS: Record<SessionStatus, SessionStatus | null> = {
   UPCOMING: "ONGOING",
