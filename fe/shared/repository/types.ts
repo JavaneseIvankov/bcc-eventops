@@ -135,7 +135,7 @@ export interface CheckInResultData {
   id: string;
   user_name: string;
   user_email: string;
-  status: RegistrationStatus;
+  status: RegistrationStatus; 
   checked_in_at: string;
 }
 

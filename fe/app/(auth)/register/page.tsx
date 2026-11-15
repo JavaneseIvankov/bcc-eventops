@@ -1,4 +1,4 @@
-"use client"
+  "use client"
 
 import { RegisterForm } from "@/features/auth/components/register-form"
 import { LogoSvg } from "@/shared/components/logo"

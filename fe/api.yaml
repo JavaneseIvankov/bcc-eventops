@@ -1,0 +1,1368 @@
+openapi: 3.0.3
+info:
+  title: BCC EventOps API
+  description: |
+    Spesifikasi REST API untuk **BCC EventOps** (Internal Hackathon).
+    - **Backend:** Go Fiber
+    - **Frontend:** Next.js
+    - **Auth:** Bearer Token (`access_token` & `refresh_token` dikembalikan lewat response body)
+    - **Konvensi JSON:** `snake_case`, ID menggunakan `UUID v4`, waktu menggunakan `ISO 8601`.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+  - url: https://api.eventops.bcc.id/api/v1
+    description: Production VM Server
+
+tags:
+  - name: Auth
+    description: Modul M1 - Registrasi, Login, Refresh Token, dan Profil
+  - name: Uploads
+    description: Upload file poster event (Should Have)
+  - name: Events
+    description: Modul M2 - Katalog dan Pengelolaan Event
+  - name: Committees
+    description: Modul M3 - Undangan dan Pengelolaan Kepanitiaan per Event
+  - name: Sessions
+    description: Modul M4 - Rundown dan Status Sesi
+  - name: Registrations
+    description: Modul M5 & M6 - Pendaftaran Peserta, Pembatalan, dan Check-in
+  - name: Operations
+    description: Modul M7 - Pengumuman, Dashboard Kehadiran, dan Daftar Peserta
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Kirim access_token lewat header `Authorization: Bearer {access_token}`"
+
+  parameters:
+    EventIdParam:
+      name: eventId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Event
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Sesi
+    InvitationIdParam:
+      name: invitationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Undangan Kepanitiaan
+    RegistrationIdParam:
+      name: registrationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Pendaftaran Peserta
+    AnnouncementIdParam:
+      name: announcementId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Pengumuman
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID dari Pengguna
+    PageQuery:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 10000
+
+  schemas:
+    EventStatus:
+      type: string
+      enum: [UPCOMING, ONGOING, FINISHED]
+    SessionStatus:
+      type: string
+      enum: [UPCOMING, ONGOING, FINISHED]
+    CommitteeRole:
+      type: string
+      enum: [COORDINATOR, COMMITTEE]
+    InvitationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED]
+    RegistrationStatus:
+      type: string
+      enum: [REGISTERED, CHECKED_IN, CANCELLED]
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total_items:
+          type: integer
+          example: 42
+        total_pages:
+          type: integer
+          example: 5
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: QUOTA_EXCEEDED
+            message:
+              type: string
+              example: Kuota peserta untuk event ini sudah penuh.
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Rafi Rahman
+        email:
+          type: string
+          format: email
+          example: rafi@bcc.id
+        created_at:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+
+    EventSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Workshop Web BCC 2026
+        short_description:
+          type: string
+          example: Belajar Go Fiber dan Next.js dari dasar hingga deployment.
+        poster_url:
+          type: string
+          nullable: true
+          example: https://api.eventops.bcc.id/uploads/posters/web-bcc.webp
+        location:
+          type: string
+          example: Gedung F Filkom UB, Ruang F2.1
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        quota_total:
+          type: integer
+          example: 50
+        quota_filled:
+          type: integer
+          example: 32
+        quota_available:
+          type: integer
+          example: 18
+        my_role:
+          $ref: '#/components/schemas/CommitteeRole'
+          nullable: true
+
+    EventDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+        - type: object
+          properties:
+            my_registration:
+              nullable: true
+              $ref: '#/components/schemas/Registration'
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    Invitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        invitee_user_id:
+          type: string
+          format: uuid
+        invitee_name:
+          type: string
+        invitee_email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/CommitteeRole'
+        status:
+          $ref: '#/components/schemas/InvitationStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    CommitteeMember:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/CommitteeRole'
+        joined_at:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Pembukaan & Pengenalan Arsitektur Go Fiber
+        description:
+          type: string
+          nullable: true
+        speaker:
+          type: string
+          example: Kak Budi (Lead Backend BCC)
+        location:
+          type: string
+          example: Ruang F2.1
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/SessionStatus'
+
+    Registration:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/RegistrationStatus'
+        qr_token:
+          type: string
+          example: EVT-998877665544-SEC
+        registered_at:
+          type: string
+          format: date-time
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ParticipantItem:
+      type: object
+      properties:
+        registration_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: '#/components/schemas/RegistrationStatus'
+        registered_at:
+          type: string
+          format: date-time
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        author_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DashboardSummary:
+      type: object
+      properties:
+        quota_total:
+          type: integer
+          example: 50
+        active_registrations:
+          type: integer
+          example: 32
+        checked_in_count:
+          type: integer
+          example: 20
+        not_checked_in_count:
+          type: integer
+          example: 12
+        cancelled_count:
+          type: integer
+          example: 3
+        quota_available:
+          type: integer
+          example: 18
+        sessions_summary:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 4
+            upcoming:
+              type: integer
+              example: 2
+            ongoing:
+              type: integer
+              example: 1
+            finished:
+              type: integer
+              example: 1
+
+  responses:
+    UnauthorizedError:
+      description: Belum login atau access_token tidak valid / kadaluarsa
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ForbiddenError:
+      description: Pengguna tidak memiliki hak akses (role tidak sesuai) pada event ini
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Resource tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==================== AUTH ====================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi akun pengguna baru
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        '201':
+          description: Registrasi berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/User'
+        '409':
+          description: Email sudah terdaftar (`EMAIL_ALREADY_EXISTS`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login pengguna dengan email dan password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login berhasil, mengembalikan access_token & refresh_token lewat response body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Memperbarui access_token menggunakan refresh_token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout dan revoke refresh_token
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Berhasil logout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    nullable: true
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Mendapatkan profil pengguna yang sedang login
+      responses:
+        '200':
+          description: Profil pengguna
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ==================== UPLOADS ====================
+  /uploads:
+    post:
+      tags: [Uploads]
+      summary: Upload file gambar poster event
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File berhasil diunggah
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        example: https://api.eventops.bcc.id/uploads/posters/e8400.webp
+
+  # ==================== EVENTS ====================
+  /events:
+    get:
+      tags: [Events]
+      summary: Katalog daftar event (Paginated & Cached di Redis)
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Cari berdasarkan nama event
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EventStatus'
+        - name: managed_by_me
+          in: query
+          schema:
+            type: boolean
+          description: Filter hanya event di mana pengguna adalah Koordinator atau Panitia aktif
+      responses:
+        '200':
+          description: Daftar event berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      tags: [Events]
+      summary: Membuat event baru (Pembuat otomatis menjadi COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, short_description, location, start_time, end_time, quota_total]
+              properties:
+                name:
+                  type: string
+                short_description:
+                  type: string
+                poster_url:
+                  type: string
+                  nullable: true
+                location:
+                  type: string
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                quota_total:
+                  type: integer
+                  minimum: 1
+      responses:
+        '201':
+          description: Event berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/EventDetail'
+
+  /events/{eventId}:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    get:
+      tags: [Events]
+      summary: Mendapatkan detail informasi event beserta status role/registrasi pengguna
+      responses:
+        '200':
+          description: Detail event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/EventDetail'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    patch:
+      tags: [Events]
+      summary: Mengubah informasi event, kapasitas, atau status event (Khusus COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                short_description:
+                  type: string
+                poster_url:
+                  type: string
+                  nullable: true
+                location:
+                  type: string
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                quota_total:
+                  type: integer
+                  minimum: 1
+                status:
+                  $ref: '#/components/schemas/EventStatus'
+      responses:
+        '200':
+          description: Event berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/EventDetail'
+        '400':
+          description: Kapasitas baru lebih kecil dari jumlah pendaftar aktif (`INVALID_STATE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+    delete:
+      tags: [Events]
+      summary: Menghapus event beserta seluruh data terkait (Khusus COORDINATOR)
+      responses:
+        '200':
+          description: Event berhasil dihapus
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # ==================== COMMITTEES & INVITATIONS ====================
+  /events/{eventId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    post:
+      tags: [Committees]
+      summary: Mengundang pengguna terdaftar sebagai panitia/koordinator (Khusus COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  $ref: '#/components/schemas/CommitteeRole'
+      responses:
+        '201':
+          description: Undangan berhasil dikirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Invitation'
+        '404':
+          description: Akun dengan email tersebut tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /me/invitations:
+    get:
+      tags: [Committees]
+      summary: Melihat daftar undangan kepanitiaan yang masuk untuk pengguna saat ini
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/InvitationStatus'
+      responses:
+        '200':
+          description: Daftar undangan kepanitiaan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invitation'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /invitations/{invitationId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/InvitationIdParam'
+    post:
+      tags: [Committees]
+      summary: Menerima undangan kepanitiaan
+      responses:
+        '200':
+          description: Undangan diterima dan pengguna resmi menjadi panitia aktif
+
+  /invitations/{invitationId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/InvitationIdParam'
+    post:
+      tags: [Committees]
+      summary: Menolak undangan kepanitiaan
+      responses:
+        '200':
+          description: Undangan ditolak
+
+  /events/{eventId}/invitations/{invitationId}:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/InvitationIdParam'
+    delete:
+      tags: [Committees]
+      summary: Membatalkan undangan yang masih berstatus PENDING (Khusus COORDINATOR)
+      responses:
+        '200':
+          description: Undangan berhasil dibatalkan
+
+  /events/{eventId}/committees:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    get:
+      tags: [Committees]
+      summary: Melihat daftar anggota panitia aktif dan status undangan (Khusus Panitia/Koordinator)
+      responses:
+        '200':
+          description: Daftar kepanitiaan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      members:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CommitteeMember'
+                      invitations:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Invitation'
+
+  /events/{eventId}/committees/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/UserIdParam'
+    patch:
+      tags: [Committees]
+      summary: Mengubah role anggota panitia aktif (Khusus COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  $ref: '#/components/schemas/CommitteeRole'
+      responses:
+        '200':
+          description: Role berhasil diubah
+        '409':
+          description: Tidak bisa menurunkan Koordinator terakhir (`LAST_COORDINATOR`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Committees]
+      summary: Mengeluarkan anggota panitia dari event (Khusus COORDINATOR)
+      responses:
+        '200':
+          description: Anggota panitia berhasil dikeluarkan
+        '409':
+          description: Tidak bisa mengeluarkan Koordinator terakhir (`LAST_COORDINATOR`)
+
+  /events/{eventId}/committees/me:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    delete:
+      tags: [Committees]
+      summary: Keluar secara mandiri dari kepanitiaan event
+      responses:
+        '200':
+          description: Berhasil keluar dari kepanitiaan
+        '409':
+          description: Koordinator terakhir tidak dapat keluar sebelum menunjuk pengganti (`LAST_COORDINATOR`)
+
+  # ==================== SESSIONS (RUNDOWN) ====================
+  /events/{eventId}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    get:
+      tags: [Sessions]
+      summary: Mendapatkan daftar sesi rundown terurut berdasarkan waktu mulai
+      responses:
+        '200':
+          description: Daftar sesi rundown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+    post:
+      tags: [Sessions]
+      summary: Menambahkan sesi baru ke dalam rundown (Khusus COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, speaker, location, start_time, end_time]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                speaker:
+                  type: string
+                location:
+                  type: string
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Sesi berhasil dibuat
+
+  /events/{eventId}/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/SessionIdParam'
+    patch:
+      tags: [Sessions]
+      summary: Mengedit detail sesi (Khusus COORDINATOR)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                speaker:
+                  type: string
+                location:
+                  type: string
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Sesi berhasil diperbarui
+
+    delete:
+      tags: [Sessions]
+      summary: Menghapus sesi dari rundown (Khusus COORDINATOR)
+      responses:
+        '200':
+          description: Sesi berhasil dihapus
+
+  /events/{eventId}/sessions/{sessionId}/status:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/SessionIdParam'
+    patch:
+      tags: [Sessions]
+      summary: Memperbarui status sesi secara realtime (COORDINATOR & COMMITTEE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/SessionStatus'
+      responses:
+        '200':
+          description: Status sesi berhasil diubah dan di-broadcast via WebSocket
+        '400':
+          description: Event sudah berstatus FINISHED sehingga sesi tidak dapat dijalankan (`INVALID_STATE`)
+
+  # ==================== REGISTRATIONS & CHECK-IN ====================
+  /events/{eventId}/registrations:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    post:
+      tags: [Registrations]
+      summary: Mendaftarkan diri sendiri sebagai peserta pada event
+      responses:
+        '201':
+          description: Pendaftaran berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Registration'
+        '400':
+          description: Event tidak berstatus UPCOMING (`INVALID_STATE`)
+        '409':
+          description: Kuota penuh (`QUOTA_EXCEEDED`) atau sudah terdaftar aktif (`ALREADY_REGISTERED`)
+
+  /me/registrations:
+    get:
+      tags: [Registrations]
+      summary: Melihat daftar event yang diikuti oleh pengguna saat ini
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RegistrationStatus'
+      responses:
+        '200':
+          description: Daftar pendaftaran saya
+
+  /events/{eventId}/registrations/me/cancel:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    post:
+      tags: [Registrations]
+      summary: Membatalkan pendaftaran diri sendiri (Hanya saat event UPCOMING & belum CHECKED_IN)
+      responses:
+        '200':
+          description: Pendaftaran berhasil dibatalkan dan kuota dilepaskan
+        '400':
+          description: Event sudah dimulai/selesai atau peserta sudah check-in (`INVALID_STATE`)
+
+  /events/{eventId}/registrations/{registrationId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/RegistrationIdParam'
+    post:
+      tags: [Registrations]
+      summary: Membatalkan pendaftaran peserta lain (Khusus COORDINATOR)
+      responses:
+        '200':
+          description: Pendaftaran peserta berhasil dibatalkan
+
+  /events/{eventId}/registrations/{registrationId}/check-in:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/RegistrationIdParam'
+    post:
+      tags: [Registrations]
+      summary: Check-in peserta secara manual dari daftar peserta (COORDINATOR & COMMITTEE)
+      responses:
+        '200':
+          description: Check-in berhasil
+        '400':
+          description: Pendaftaran berstatus CANCELLED atau Event sudah FINISHED (`INVALID_STATE`)
+        '409':
+          description: Peserta sudah berstatus CHECKED_IN sebelumnya (`ALREADY_CHECKED_IN`)
+
+  /events/{eventId}/check-in/qr:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    post:
+      tags: [Registrations]
+      summary: Check-in peserta dengan memindai QR Token (COORDINATOR & COMMITTEE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_token]
+              properties:
+                qr_token:
+                  type: string
+                  example: EVT-998877665544-SEC
+      responses:
+        '200':
+          description: Check-in via QR berhasil
+        '409':
+          description: Peserta sudah berstatus CHECKED_IN (`ALREADY_CHECKED_IN`)
+
+  # ==================== OPERATIONS (ANNOUNCEMENTS, DASHBOARD, PARTICIPANTS) ====================
+  /events/{eventId}/announcements:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    get:
+      tags: [Operations]
+      summary: Mendapatkan daftar pengumuman event (Terbaru di atas)
+      responses:
+        '200':
+          description: Daftar pengumuman
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Announcement'
+
+    post:
+      tags: [Operations]
+      summary: Membuat pengumuman baru (COORDINATOR & COMMITTEE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Pengumuman berhasil diterbitkan
+
+  /events/{eventId}/announcements/{announcementId}:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/AnnouncementIdParam'
+    patch:
+      tags: [Operations]
+      summary: Mengedit pengumuman (COORDINATOR & COMMITTEE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Pengumuman berhasil diperbarui
+
+    delete:
+      tags: [Operations]
+      summary: Menghapus pengumuman (COORDINATOR & COMMITTEE)
+      responses:
+        '200':
+          description: Pengumuman berhasil dihapus
+
+  /events/{eventId}/dashboard:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+    get:
+      tags: [Operations]
+      summary: Mendapatkan ringkasan statistik operasional kehadiran & sesi (COORDINATOR & COMMITTEE)
+      responses:
+        '200':
+          description: Ringkasan operasional event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/DashboardSummary'
+
+  /events/{eventId}/participants:
+    parameters:
+      - $ref: '#/components/parameters/EventIdParam'
+      - $ref: '#/components/parameters/PageQuery'
+      - $ref: '#/components/parameters/LimitQuery'
+      - name: search
+        in: query
+        schema:
+          type: string
+        description: Cari peserta berdasarkan nama atau email
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/RegistrationStatus'
+    get:
+      tags: [Operations]
+      summary: Mendapatkan daftar tabel peserta dengan pencarian & filter (COORDINATOR & COMMITTEE)
+      responses:
+        '200':
+          description: Daftar peserta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ParticipantItem'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
