@@ -1,4 +1,32 @@
 basePath: /api/v1
+definitions:
+  github_com_bcc_eventops-be_internal_dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -10,7 +38,111 @@ info:
   termsOfService: http://swagger.io/terms/
   title: BCC EventOps API
   version: 1.0.0
-paths: {}
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Kredensial login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
+        "400":
+          description: Data yang dikirim tidak valid
+          schema:
+            type: string
+        "401":
+          description: Email atau password salah
+          schema:
+            type: string
+      summary: Login pengguna dengan email dan password
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout berhasil
+          schema:
+            type: string
+      summary: Logout dan menghapus cookie autentikasi
+      tags:
+      - Auth
+  /auth/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
+        "401":
+          description: Autentikasi diperlukan
+          schema:
+            type: string
+      security:
+      - cookieAuth: []
+      summary: Mendapatkan profil pengguna yang sedang login
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token berhasil diperbarui
+          schema:
+            type: string
+        "401":
+          description: Autentikasi diperlukan
+          schema:
+            type: string
+      summary: Memperbarui access_token menggunakan refresh_token dari cookie
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data registrasi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
+        "400":
+          description: Data yang dikirim tidak valid
+          schema:
+            type: string
+        "409":
+          description: Email sudah terdaftar
+          schema:
+            type: string
+      summary: Registrasi akun pengguna baru
+      tags:
+      - Auth
 schemes:
 - http
 - https
