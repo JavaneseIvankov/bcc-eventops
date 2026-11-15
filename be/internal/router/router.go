@@ -1,9 +1,12 @@
 package router
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
+	"strings"
 
+	"github.com/bcc/eventops-be/docs"
 	"github.com/bcc/eventops-be/internal/config"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/handler"
@@ -17,11 +20,222 @@ import (
 	"gorm.io/gorm"
 )
 
+var swaggerServers = []map[string]string{
+	{"url": "/api/v1", "description": "Local Development Server"},
+	{"url": "https://group4-be.bccdev.id/api/v1", "description": "Production Server"},
+}
+
+func serveSwaggerSpec(c *fiber.Ctx) error {
+	raw := docs.SwaggerInfo.ReadDoc()
+
+	var spec map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &spec); err != nil {
+		return err
+	}
+
+	components := map[string]json.RawMessage{}
+
+	if v, ok := spec["definitions"]; ok {
+		components["schemas"] = rewriteRefs(v)
+		delete(spec, "definitions")
+	}
+
+	if v, ok := spec["parameters"]; ok {
+		components["parameters"] = rewriteRefs(v)
+		delete(spec, "parameters")
+	}
+
+	if v, ok := spec["securityDefinitions"]; ok {
+		components["securitySchemes"] = convertSecurityDefinitions(v)
+		delete(spec, "securityDefinitions")
+	}
+
+	if paths, ok := spec["paths"]; ok {
+		paths = rewriteRefs(paths)
+		paths = convertBodyParams(paths)
+		spec["paths"] = paths
+	}
+
+	spec["components"] = mustMarshal(components)
+	spec["openapi"] = mustMarshal("3.0.3")
+	spec["servers"] = mustMarshal(swaggerServers)
+	delete(spec, "swagger")
+	delete(spec, "host")
+	delete(spec, "basePath")
+
+	buf, err := json.Marshal(spec)
+	if err != nil {
+		return err
+	}
+
+	c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	return c.Send(buf)
+}
+
+func convertResponses(v json.RawMessage) json.RawMessage {
+	var responses map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(v, &responses); err != nil {
+		return v
+	}
+
+	for code, resp := range responses {
+		schema, ok := resp["schema"]
+		if !ok {
+			continue
+		}
+
+		resp["content"] = mustMarshal(map[string]json.RawMessage{
+			"application/json": mustMarshal(map[string]json.RawMessage{"schema": schema}),
+		})
+		delete(resp, "schema")
+
+		responses[code] = resp
+	}
+
+	return mustMarshal(responses)
+}
+
+func rewriteRefs(v json.RawMessage) json.RawMessage {
+	s := string(v)
+	s = strings.ReplaceAll(s, "#/definitions/", "#/components/schemas/")
+	s = strings.ReplaceAll(s, "#/parameters/", "#/components/parameters/")
+	return json.RawMessage(s)
+}
+
+func convertBodyParams(v json.RawMessage) json.RawMessage {
+	var paths map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(v, &paths); err != nil {
+		return v
+	}
+
+	for path, ops := range paths {
+		for method, rawOp := range ops {
+			var op map[string]json.RawMessage
+			if err := json.Unmarshal(rawOp, &op); err != nil {
+				continue
+			}
+
+			var params []map[string]json.RawMessage
+			if rawParams, ok := op["parameters"]; ok {
+				_ = json.Unmarshal(rawParams, &params)
+			}
+
+			var kept []map[string]json.RawMessage
+			var bodyParam map[string]json.RawMessage
+			for _, p := range params {
+				var in string
+				_ = json.Unmarshal(p["in"], &in)
+				if in == "body" {
+					bodyParam = p
+					continue
+				}
+				if in == "formData" {
+					continue
+				}
+				kept = append(kept, p)
+			}
+
+			if bodyParam != nil {
+				schema := bodyParam["schema"]
+				if schema == nil {
+					schema = mustMarshal(map[string]string{"type": "object"})
+				}
+
+				var desc string
+				_ = json.Unmarshal(bodyParam["description"], &desc)
+
+				required := true
+				if r, ok := bodyParam["required"]; ok {
+					_ = json.Unmarshal(r, &required)
+				}
+
+				content := map[string]json.RawMessage{
+					"application/json": mustMarshal(map[string]json.RawMessage{"schema": schema}),
+				}
+
+				body := map[string]json.RawMessage{
+					"content":  mustMarshal(content),
+					"required": mustMarshal(required),
+				}
+				if desc != "" {
+					body["description"] = mustMarshal(desc)
+				}
+				op["requestBody"] = mustMarshal(body)
+			}
+
+			if len(kept) > 0 {
+				op["parameters"] = mustMarshal(kept)
+			} else {
+				delete(op, "parameters")
+			}
+
+			delete(op, "consumes")
+			delete(op, "produces")
+			delete(op, "schemes")
+
+			if rawResp, ok := op["responses"]; ok {
+				op["responses"] = convertResponses(rawResp)
+			}
+
+			out, err := json.Marshal(op)
+			if err != nil {
+				continue
+			}
+			ops[method] = out
+		}
+		paths[path] = ops
+	}
+
+	return mustMarshal(paths)
+}
+
+func convertSecurityDefinitions(v json.RawMessage) json.RawMessage {
+	var defs map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(v, &defs); err != nil {
+		return v
+	}
+
+	out := map[string]map[string]json.RawMessage{}
+	for name, def := range defs {
+		var typ string
+		_ = json.Unmarshal(def["type"], &typ)
+
+		switch typ {
+		case "apiKey":
+			var in string
+			_ = json.Unmarshal(def["in"], &in)
+			out[name] = def
+			if in == "header" {
+				delete(def, "in")
+				delete(def, "name")
+				def["type"] = mustMarshal("http")
+				def["scheme"] = mustMarshal("bearer")
+			}
+		case "basic":
+			out[name] = map[string]json.RawMessage{
+				"type":        mustMarshal("http"),
+				"scheme":      mustMarshal("basic"),
+				"description": def["description"],
+			}
+		default:
+			out[name] = def
+		}
+	}
+
+	return mustMarshal(out)
+}
+
+func mustMarshal(v any) json.RawMessage {
+	buf, _ := json.Marshal(v)
+	return buf
+}
+
 func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": cfg.App.Name})
 	})
 
+	app.Get("/swagger/doc.json", serveSwaggerSpec)
 	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	userRepo := repository.NewUserRepository(db)
