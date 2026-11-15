@@ -15,6 +15,7 @@ import (
 	"github.com/bcc/eventops-be/internal/repository"
 	"github.com/bcc/eventops-be/internal/response"
 	"github.com/bcc/eventops-be/internal/service"
+	"github.com/bcc/eventops-be/internal/ws"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 	"gorm.io/gorm"
@@ -243,25 +244,31 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWT)
 	authHandler := handler.NewAuthHandler(authService)
 
+	realtimeHub := ws.NewHub()
+	realtimeHandler := handler.NewRealtimeHandler(realtimeHub)
+
 	eventRepo := repository.NewEventRepository(db)
 	registrationRepo := repository.NewRegistrationRepository(db)
 	committeeRepo := repository.NewCommitteeRepository(db)
 	eventService := service.NewEventService(eventRepo, registrationRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
-	registrationService := service.NewRegistrationService(registrationRepo)
+	registrationService := service.NewRegistrationService(registrationRepo, eventRepo, realtimeHub)
 	registrationHandler := handler.NewRegistrationHandler(registrationService)
 
 	sessionRepo := repository.NewSessionRepository(db)
 	dashboardService := service.NewDashboardService(eventRepo, registrationRepo, sessionRepo)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
+	sessionService := service.NewSessionService(sessionRepo, eventRepo, committeeRepo, realtimeHub)
+	sessionHandler := handler.NewSessionHandler(sessionService)
+
 	invitationRepo := repository.NewInvitationRepository(db)
-	committeeService := service.NewCommitteeService(invitationRepo, committeeRepo, userRepo)
+	committeeService := service.NewCommitteeService(invitationRepo, committeeRepo, userRepo, realtimeHub)
 	committeeHandler := handler.NewCommitteeHandler(committeeService)
 
 	announcementRepo := repository.NewAnnouncementRepository(db)
-	announcementService := service.NewAnnouncementService(announcementRepo)
+	announcementService := service.NewAnnouncementService(announcementRepo, realtimeHub)
 	announcementHandler := handler.NewAnnouncementHandler(announcementService)
 
 	api := app.Group("/api/v1")
@@ -297,6 +304,13 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	registrations.Post("/:registrationId/cancel", requireCoordinator, registrationHandler.CancelByID)
 	registrations.Post("/:registrationId/check-in", requireCommittee, registrationHandler.CheckIn)
 
+	sessions := events.Group("/:eventId/sessions")
+	sessions.Get("/", sessionHandler.List)
+	sessions.Post("/", requireCoordinator, sessionHandler.Create)
+	sessions.Patch("/:sessionId", requireCoordinator, sessionHandler.Update)
+	sessions.Delete("/:sessionId", requireCoordinator, sessionHandler.Delete)
+	sessions.Patch("/:sessionId/status", requireCommittee, sessionHandler.UpdateStatus)
+
 	me := api.Group("/me", authMiddleware)
 	me.Get("/registrations", registrationHandler.ListMine)
 	me.Get("/invitations", committeeHandler.ListMyInvitations)
@@ -319,6 +333,11 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	events.Post("/:eventId/announcements", requireCommittee, announcementHandler.Create)
 	events.Patch("/:eventId/announcements/:announcementId", requireCommittee, announcementHandler.Update)
 	events.Delete("/:eventId/announcements/:announcementId", requireCommittee, announcementHandler.Delete)
+
+	wsAuth := middleware.RequireWSAuth(cfg)
+	wsEvents := app.Group("/ws/v1/events/:eventId")
+	wsEvents.Get("/public", middleware.RequireWSUpgrade, wsAuth, realtimeHandler.PublicRoom)
+	wsEvents.Get("/committee", middleware.RequireWSUpgrade, wsAuth, requireCommittee, realtimeHandler.CommitteeRoom)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {

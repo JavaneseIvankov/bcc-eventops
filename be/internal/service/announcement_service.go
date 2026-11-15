@@ -5,6 +5,7 @@ import (
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
+	"github.com/bcc/eventops-be/internal/ws"
 	"github.com/google/uuid"
 )
 
@@ -17,10 +18,11 @@ type AnnouncementService interface {
 
 type announcementService struct {
 	announcementRepo repository.AnnouncementRepository
+	hub              *ws.Hub
 }
 
-func NewAnnouncementService(announcementRepo repository.AnnouncementRepository) AnnouncementService {
-	return &announcementService{announcementRepo: announcementRepo}
+func NewAnnouncementService(announcementRepo repository.AnnouncementRepository, hub *ws.Hub) AnnouncementService {
+	return &announcementService{announcementRepo: announcementRepo, hub: hub}
 }
 
 func (s *announcementService) List(eventID uuid.UUID) ([]models.Announcement, error) {
@@ -37,6 +39,9 @@ func (s *announcementService) Create(eventID, authorID uuid.UUID, req dto.Create
 	if err := s.announcementRepo.Create(announcement); err != nil {
 		return nil, err
 	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventAnnouncementCreated, dto.NewAnnouncementResponse(announcement)))
+
 	return announcement, nil
 }
 
@@ -56,6 +61,9 @@ func (s *announcementService) Update(eventID, announcementID uuid.UUID, req dto.
 	if err := s.announcementRepo.Update(announcement); err != nil {
 		return nil, err
 	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventAnnouncementUpdated, dto.NewAnnouncementResponse(announcement)))
+
 	return announcement, nil
 }
 
@@ -64,7 +72,15 @@ func (s *announcementService) Delete(eventID, announcementID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	return s.announcementRepo.Delete(announcement.ID)
+	if err := s.announcementRepo.Delete(announcement.ID); err != nil {
+		return err
+	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventAnnouncementDeleted, map[string]any{
+		"id": announcement.ID,
+	}))
+
+	return nil
 }
 
 func (s *announcementService) findInEvent(eventID, announcementID uuid.UUID) (*models.Announcement, error) {

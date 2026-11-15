@@ -8,6 +8,7 @@ import (
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
+	"github.com/bcc/eventops-be/internal/ws"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -24,13 +25,15 @@ type sessionService struct {
 	sessionRepo   repository.SessionRepository
 	eventRepo     repository.EventRepository
 	committeeRepo repository.CommitteeRepository
+	hub           *ws.Hub
 }
 
-func NewSessionService(sessionRepo repository.SessionRepository, eventRepo repository.EventRepository, committeeRepo repository.CommitteeRepository) SessionService {
+func NewSessionService(sessionRepo repository.SessionRepository, eventRepo repository.EventRepository, committeeRepo repository.CommitteeRepository, hub *ws.Hub) SessionService {
 	return &sessionService{
 		sessionRepo:   sessionRepo,
 		eventRepo:     eventRepo,
 		committeeRepo: committeeRepo,
+		hub:           hub,
 	}
 }
 
@@ -63,6 +66,8 @@ func (s *sessionService) Create(eventID, userID uuid.UUID, req dto.CreateSession
 	if err := s.sessionRepo.Create(session); err != nil {
 		return nil, err
 	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventSessionCreated, dto.NewSessionResponse(session)))
 
 	return session, nil
 }
@@ -107,6 +112,8 @@ func (s *sessionService) Update(eventID, sessionID, userID uuid.UUID, req dto.Up
 		return nil, err
 	}
 
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventSessionUpdated, dto.NewSessionResponse(session)))
+
 	return session, nil
 }
 
@@ -123,7 +130,15 @@ func (s *sessionService) Delete(eventID, sessionID, userID uuid.UUID) error {
 		return err
 	}
 
-	return s.sessionRepo.Delete(session.ID)
+	if err := s.sessionRepo.Delete(session.ID); err != nil {
+		return err
+	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventSessionDeleted, map[string]any{
+		"id": session.ID,
+	}))
+
+	return nil
 }
 
 func (s *sessionService) UpdateStatus(eventID, sessionID, userID uuid.UUID, status string) (*models.Session, error) {
@@ -147,6 +162,8 @@ func (s *sessionService) UpdateStatus(eventID, sessionID, userID uuid.UUID, stat
 	if err := s.sessionRepo.Update(session); err != nil {
 		return nil, err
 	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventSessionStatusChanged, dto.NewSessionResponse(session)))
 
 	return session, nil
 }
