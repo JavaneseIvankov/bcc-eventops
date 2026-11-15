@@ -442,6 +442,175 @@ const docTemplate = `{
                 }
             }
         },
+        "/events/{eventId}/announcements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Mendapatkan daftar pengumuman event (Terbaru di atas)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Membuat pengumuman baru (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data pengumuman",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.CreateAnnouncementRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{eventId}/announcements/{announcementId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Menghapus pengumuman (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID Pengumuman",
+                        "name": "announcementId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pengumuman berhasil dihapus",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Mengedit pengumuman (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID Pengumuman",
+                        "name": "announcementId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Data pengumuman yang diubah",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateAnnouncementRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/events/{eventId}/committees": {
             "get": {
                 "security": [
@@ -1389,6 +1558,32 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_bcc_eventops-be_internal_dto.AnnouncementResponse": {
+            "type": "object",
+            "properties": {
+                "author_name": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.AuthResponse": {
             "type": "object",
             "properties": {
@@ -1440,6 +1635,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse"
                     }
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.CreateAnnouncementRequest": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -1798,6 +2004,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.UpdateAnnouncementRequest": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }

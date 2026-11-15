@@ -1,5 +1,22 @@
 basePath: /api/v1
 definitions:
+  github_com_bcc_eventops-be_internal_dto.AnnouncementResponse:
+    properties:
+      author_name:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.AuthResponse:
     properties:
       access_token:
@@ -34,6 +51,13 @@ definitions:
         items:
           $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse'
         type: array
+    type: object
+  github_com_bcc_eventops-be_internal_dto.CreateAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.CreateEventRequest:
     properties:
@@ -267,6 +291,13 @@ definitions:
       refresh_token:
         type: string
       token_type:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UpdateAnnouncementRequest:
+    properties:
+      content:
+        type: string
+      title:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.UpdateEventRequest:
@@ -602,6 +633,112 @@ paths:
       summary: Mengubah informasi event atau kapasitas (Khusus COORDINATOR)
       tags:
       - Events
+  /events/{eventId}/announcements:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Mendapatkan daftar pengumuman event (Terbaru di atas)
+      tags:
+      - Operations
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Data pengumuman
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CreateAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse'
+      security:
+      - BearerAuth: []
+      summary: Membuat pengumuman baru (COORDINATOR & COMMITTEE)
+      tags:
+      - Operations
+  /events/{eventId}/announcements/{announcementId}:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pengumuman
+        in: path
+        name: announcementId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pengumuman berhasil dihapus
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Menghapus pengumuman (COORDINATOR & COMMITTEE)
+      tags:
+      - Operations
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pengumuman
+        in: path
+        name: announcementId
+        required: true
+        type: string
+      - description: Data pengumuman yang diubah
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateAnnouncementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.AnnouncementResponse'
+      security:
+      - BearerAuth: []
+      summary: Mengedit pengumuman (COORDINATOR & COMMITTEE)
+      tags:
+      - Operations
   /events/{eventId}/committees:
     get:
       parameters:

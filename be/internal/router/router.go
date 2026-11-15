@@ -260,6 +260,10 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	committeeService := service.NewCommitteeService(invitationRepo, committeeRepo, userRepo)
 	committeeHandler := handler.NewCommitteeHandler(committeeService)
 
+	announcementRepo := repository.NewAnnouncementRepository(db)
+	announcementService := service.NewAnnouncementService(announcementRepo)
+	announcementHandler := handler.NewAnnouncementHandler(announcementService)
+
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -310,6 +314,11 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	invitations := api.Group("/invitations", authMiddleware)
 	invitations.Post("/:invitationId/accept", committeeHandler.Accept)
 	invitations.Post("/:invitationId/reject", committeeHandler.Reject)
+
+	events.Get("/:eventId/announcements", announcementHandler.List)
+	events.Post("/:eventId/announcements", requireCommittee, announcementHandler.Create)
+	events.Patch("/:eventId/announcements/:announcementId", requireCommittee, announcementHandler.Update)
+	events.Delete("/:eventId/announcements/:announcementId", requireCommittee, announcementHandler.Delete)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {
