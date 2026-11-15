@@ -15,38 +15,71 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/shared/components/ui/sidebar"
-import { GalleryVerticalEndIcon } from "lucide-react"
+import {
+  BarChart,
+  CalendarDays,
+  GalleryHorizontal,
+  GalleryVerticalEndIcon,
+  Grid2X2,
+  Group,
+  Megaphone,
+  ScanQrCode,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
+import { LogoImage, LogoSvg } from "./logo"
+import { Separator } from "./ui/separator"
 
 const pathify = (slug: string) => `/admin/dashboard/${slug}`
 
+type NavItem = {
+  icon?: LucideIcon
+  title: string
+  url: string
+  isActive?: boolean
+}
+
+type NavGroup = {
+  title: string
+  url: string
+  items: NavItem[]
+}
+
 // This is sample data.
-const data = {
+const data: { navMain: NavGroup[] } = {
   navMain: [
     {
       title: "Event Operations",
       url: "#",
       items: [
         {
+          icon: Grid2X2,
           title: "Overview",
           url: pathify("overview"),
         },
         {
+          icon: Users,
           title: "Participants",
           url: pathify("participants"),
         },
         {
+          icon: ScanQrCode,
           title: "Check-in",
           url: pathify("check-in"),
         },
         {
+          icon: CalendarDays,
           title: "Session Rundown",
           url: pathify("session-rundown"),
         },
         {
+          icon: Megaphone,
           title: "Announcements",
           url: pathify("announcements"),
         },
         {
+          icon: BarChart,
           title: "Reports",
           url: pathify("reports"),
         },
@@ -57,12 +90,15 @@ const data = {
       url: "#",
       items: [
         {
+          icon: Users,
           title: "Comitee Team",
           url: pathify("comitee-team"),
         },
         {
+          icon: Settings,
           title: "Event Settings",
           url: pathify("event-settings"),
+          isActive: true,
         },
       ],
     },
@@ -76,12 +112,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<a href="#" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <GalleryVerticalEndIcon className="size-4" />
-              </div>
+              <LogoImage className="size-20" />
+              <Separator orientation="vertical" />
               <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-medium">Documentation</span>
-                <span className="">v1.0.0</span>
+                <span className="text-lg font-bold text-primary">BCCin</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -105,7 +139,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           isActive={item.isActive}
                           render={<a href={item.url} />}
                         >
-                          {item.title}
+                          {item.icon ? <item.icon className="size-4" /> : null}
+                          <span>{item.title}</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     ))}
