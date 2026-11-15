@@ -1,0 +1,9 @@
+services:
+  fe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bcc-eventops-fe
+    restart: unless-stopped
+    ports:
+      - "80:80"

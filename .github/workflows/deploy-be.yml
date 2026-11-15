@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "be/**"
-      - "docker-compose.yml"
       - ".github/workflows/deploy-be.yml"
 
   workflow_dispatch:
@@ -50,14 +49,16 @@ jobs:
             echo "=== Pull Latest Code ==="
             git pull origin main
 
+            cd be
+
             # Build & restart backend container
             echo "=== Build & Restart Backend Container ==="
-            docker compose up -d --build be
+            docker compose up -d --build
 
             # Check container status
             echo "=== Container Status ==="
-            docker compose ps be
-            docker compose logs --tail 50 be
+            docker compose ps
+            docker compose logs --tail 50
 
             echo "================================"
             echo "BACKEND DEPLOYMENT SUCCESSFUL!"
