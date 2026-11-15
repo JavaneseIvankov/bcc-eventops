@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
-import { CalendarX, QrCode, Ticket } from "lucide-react"
+import { QrCode, Ticket } from "lucide-react"
 import { Button, buttonVariants } from "@/shared/components/ui/button"
 import { cn } from "@/shared/lib/utils"
 import { Badge } from "@/shared/components/ui/badge"
