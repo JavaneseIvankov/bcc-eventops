@@ -442,6 +442,99 @@ const docTemplate = `{
                 }
             }
         },
+        "/events/{eventId}/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Mendapatkan ringkasan statistik operasional kehadiran \u0026 sesi (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.DashboardSummaryResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{eventId}/participants": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Mendapatkan daftar tabel peserta dengan pencarian \u0026 filter (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Halaman",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Jumlah per halaman",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cari berdasarkan nama atau email",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter status pendaftaran",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.ParticipantResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/events/{eventId}/registrations": {
             "post": {
                 "security": [
@@ -559,6 +652,58 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "Pendaftaran peserta berhasil dibatalkan",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{eventId}/registrations/{registrationId}/check-in": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Registrations"
+                ],
+                "summary": "Check-in peserta secara manual dari daftar peserta (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID Pendaftaran",
+                        "name": "registrationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Pendaftaran berstatus CANCELLED atau Event sudah FINISHED",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Peserta sudah berstatus CHECKED_IN sebelumnya",
                         "schema": {
                             "type": "string"
                         }
@@ -932,6 +1077,32 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_bcc_eventops-be_internal_dto.DashboardSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "active_registrations": {
+                    "type": "integer"
+                },
+                "cancelled_count": {
+                    "type": "integer"
+                },
+                "checked_in_count": {
+                    "type": "integer"
+                },
+                "not_checked_in_count": {
+                    "type": "integer"
+                },
+                "quota_available": {
+                    "type": "integer"
+                },
+                "quota_total": {
+                    "type": "integer"
+                },
+                "sessions_summary": {
+                    "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.SessionsSummary"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.EventDetailResponse": {
             "type": "object",
             "properties": {
@@ -1039,6 +1210,32 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_bcc_eventops-be_internal_dto.ParticipantResponse": {
+            "type": "object",
+            "properties": {
+                "checked_in_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "registered_at": {
+                    "type": "string"
+                },
+                "registration_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.RefreshRequest": {
             "type": "object",
             "properties": {
@@ -1116,6 +1313,23 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.SessionsSummary": {
+            "type": "object",
+            "properties": {
+                "finished": {
+                    "type": "integer"
+                },
+                "ongoing": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "upcoming": {
+                    "type": "integer"
                 }
             }
         },
