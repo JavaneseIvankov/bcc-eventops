@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/bcc/eventops-be/internal/dto"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/utils"
@@ -18,6 +19,9 @@ type RegistrationRepository interface {
 	CancelSelf(eventID, userID uuid.UUID) error
 	CancelByID(eventID, registrationID uuid.UUID) error
 	FindByUserID(userID uuid.UUID, page, limit int, status string) ([]models.Registration, int64, error)
+	FindParticipants(eventID uuid.UUID, page, limit int, search, status string) ([]dto.ParticipantResponse, int64, error)
+	CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error)
+	CountByStatus(eventID uuid.UUID) (map[string]int64, error)
 }
 
 type registrationRepository struct {
@@ -126,6 +130,104 @@ func (r *registrationRepository) FindByUserID(userID uuid.UUID, page, limit int,
 	}
 
 	return registrations, total, nil
+}
+
+func (r *registrationRepository) FindParticipants(eventID uuid.UUID, page, limit int, search, status string) ([]dto.ParticipantResponse, int64, error) {
+	query := r.db.Table("registrations").
+		Joins("JOIN users ON users.id = registrations.user_id").
+		Where("registrations.event_id = ?", eventID)
+
+	if search != "" {
+		query = query.Where("users.name ILIKE ? OR users.email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if status != "" {
+		query = query.Where("registrations.status = ?", status)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var participants []dto.ParticipantResponse
+	offset := (page - 1) * limit
+	err := query.Select(
+		"registrations.id AS registration_id, registrations.user_id, users.name, users.email, registrations.status, registrations.registered_at, registrations.checked_in_at",
+	).Order("registrations.registered_at DESC").Limit(limit).Offset(offset).Scan(&participants).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return participants, total, nil
+}
+
+func (r *registrationRepository) CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error) {
+	now := utils.NowUTC()
+
+	result := r.db.Model(&models.Registration{}).
+		Where("id = ? AND event_id = ? AND status = ?", registrationID, eventID, models.RegistrationRegistered).
+		Where("EXISTS (SELECT 1 FROM events WHERE events.id = registrations.event_id AND events.status != ?)", models.EventStatusFinished).
+		Updates(map[string]interface{}{"status": models.RegistrationCheckedIn, "checked_in_at": now})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, r.checkInFailureReason(eventID, registrationID)
+	}
+
+	var reg models.Registration
+	if err := r.db.First(&reg, "id = ? AND event_id = ?", registrationID, eventID).Error; err != nil {
+		return nil, err
+	}
+	return &reg, nil
+}
+
+func (r *registrationRepository) CountByStatus(eventID uuid.UUID) (map[string]int64, error) {
+	type statusCount struct {
+		Status string
+		Count  int64
+	}
+
+	var rows []statusCount
+	if err := r.db.Model(&models.Registration{}).
+		Select("status, count(*) as count").
+		Where("event_id = ?", eventID).
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	counts := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		counts[row.Status] = row.Count
+	}
+	return counts, nil
+}
+
+func (r *registrationRepository) checkInFailureReason(eventID, registrationID uuid.UUID) error {
+	var event models.Event
+	if err := r.db.First(&event, "id = ?", eventID).Error; err != nil {
+		return err
+	}
+	if event.Status == models.EventStatusFinished {
+		return apperr.New(http.StatusBadRequest, "INVALID_STATE", "Event sudah berstatus FINISHED, check-in tidak dapat dilakukan.")
+	}
+
+	var reg models.Registration
+	if err := r.db.First(&reg, "id = ? AND event_id = ?", registrationID, eventID).Error; err != nil {
+		return err
+	}
+
+	switch reg.Status {
+	case models.RegistrationCancelled:
+		return apperr.New(http.StatusBadRequest, "INVALID_STATE", "Pendaftaran berstatus CANCELLED, tidak dapat check-in.")
+	case models.RegistrationCheckedIn:
+		return apperr.NewWithData(http.StatusConflict, "ALREADY_CHECKED_IN", "Peserta sudah berstatus CHECKED_IN sebelumnya.", map[string]any{
+			"checked_in_at": reg.CheckedInAt,
+		})
+	default:
+		return apperr.ErrInvalidInput
+	}
 }
 
 func (r *registrationRepository) cancel(eventID uuid.UUID, find func(tx *gorm.DB) (*models.Registration, error)) error {

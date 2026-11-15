@@ -252,6 +252,10 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	registrationService := service.NewRegistrationService(registrationRepo)
 	registrationHandler := handler.NewRegistrationHandler(registrationService)
 
+	sessionRepo := repository.NewSessionRepository(db)
+	dashboardService := service.NewDashboardService(eventRepo, registrationRepo, sessionRepo)
+	dashboardHandler := handler.NewDashboardHandler(dashboardService)
+
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -270,6 +274,7 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	auth.Post("/logout", authHandler.Logout)
 
 	requireCoordinator := middleware.RequireEventRole(committeeRepo, models.RoleCoordinator)
+	requireCommittee := middleware.RequireEventRole(committeeRepo, models.RoleCoordinator, models.RoleCommittee)
 
 	events := api.Group("/events", authMiddleware)
 	events.Get("/", eventHandler.List)
@@ -282,14 +287,21 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	registrations.Post("/", registrationHandler.Register)
 	registrations.Post("/me/cancel", registrationHandler.CancelSelf)
 	registrations.Post("/:registrationId/cancel", requireCoordinator, registrationHandler.CancelByID)
+	registrations.Post("/:registrationId/check-in", requireCommittee, registrationHandler.CheckIn)
 
 	me := api.Group("/me", authMiddleware)
 	me.Get("/registrations", registrationHandler.ListMine)
+
+	events.Get("/:eventId/participants", requireCommittee, registrationHandler.ListParticipants)
+	events.Get("/:eventId/dashboard", requireCommittee, dashboardHandler.Get)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {
 	var appErr *apperr.AppError
 	if errors.As(err, &appErr) {
+		if appErr.Data != nil {
+			return response.ErrorWithData(c, appErr.Status, appErr.Code, appErr.Message, appErr.Data)
+		}
 		return response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 	}
 

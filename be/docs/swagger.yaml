@@ -43,6 +43,23 @@ definitions:
       title:
         type: string
     type: object
+  github_com_bcc_eventops-be_internal_dto.DashboardSummaryResponse:
+    properties:
+      active_registrations:
+        type: integer
+      cancelled_count:
+        type: integer
+      checked_in_count:
+        type: integer
+      not_checked_in_count:
+        type: integer
+      quota_available:
+        type: integer
+      quota_total:
+        type: integer
+      sessions_summary:
+        $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.SessionsSummary'
+    type: object
   github_com_bcc_eventops-be_internal_dto.EventDetailResponse:
     properties:
       created_at:
@@ -113,6 +130,23 @@ definitions:
       refresh_token:
         type: string
     type: object
+  github_com_bcc_eventops-be_internal_dto.ParticipantResponse:
+    properties:
+      checked_in_at:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      registered_at:
+        type: string
+      registration_id:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.RefreshRequest:
     properties:
       refresh_token:
@@ -164,6 +198,17 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.SessionsSummary:
+    properties:
+      finished:
+        type: integer
+      ongoing:
+        type: integer
+      total:
+        type: integer
+      upcoming:
+        type: integer
     type: object
   github_com_bcc_eventops-be_internal_dto.TokenResponse:
     properties:
@@ -502,6 +547,66 @@ paths:
       summary: Mengubah informasi event atau kapasitas (Khusus COORDINATOR)
       tags:
       - Events
+  /events/{eventId}/dashboard:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.DashboardSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: Mendapatkan ringkasan statistik operasional kehadiran & sesi (COORDINATOR
+        & COMMITTEE)
+      tags:
+      - Operations
+  /events/{eventId}/participants:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Halaman
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman
+        in: query
+        name: limit
+        type: integer
+      - description: Cari berdasarkan nama atau email
+        in: query
+        name: search
+        type: string
+      - description: Filter status pendaftaran
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.ParticipantResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Mendapatkan daftar tabel peserta dengan pencarian & filter (COORDINATOR
+        & COMMITTEE)
+      tags:
+      - Operations
   /events/{eventId}/registrations:
     post:
       parameters:
@@ -553,6 +658,39 @@ paths:
       security:
       - BearerAuth: []
       summary: Membatalkan pendaftaran peserta lain (Khusus COORDINATOR)
+      tags:
+      - Registrations
+  /events/{eventId}/registrations/{registrationId}/check-in:
+    post:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pendaftaran
+        in: path
+        name: registrationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse'
+        "400":
+          description: Pendaftaran berstatus CANCELLED atau Event sudah FINISHED
+          schema:
+            type: string
+        "409":
+          description: Peserta sudah berstatus CHECKED_IN sebelumnya
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Check-in peserta secara manual dari daftar peserta (COORDINATOR & COMMITTEE)
       tags:
       - Registrations
   /events/{eventId}/registrations/me/cancel:
