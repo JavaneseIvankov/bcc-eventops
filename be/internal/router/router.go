@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bcc/eventops-be/docs"
+	"github.com/bcc/eventops-be/internal/cache"
 	"github.com/bcc/eventops-be/internal/config"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/handler"
@@ -247,13 +248,19 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	realtimeHub := ws.NewHub()
 	realtimeHandler := handler.NewRealtimeHandler(realtimeHub)
 
+	redisClient, err := cache.NewClient(cfg.Redis)
+	if err != nil {
+		log.Printf("warning: gagal konek ke Redis, cache akan dilewati: %v", err)
+	}
+	eventCache := cache.NewEventCache(redisClient)
+
 	eventRepo := repository.NewEventRepository(db)
 	registrationRepo := repository.NewRegistrationRepository(db)
 	committeeRepo := repository.NewCommitteeRepository(db)
-	eventService := service.NewEventService(eventRepo, registrationRepo)
+	eventService := service.NewEventService(eventRepo, registrationRepo, eventCache)
 	eventHandler := handler.NewEventHandler(eventService)
 
-	registrationService := service.NewRegistrationService(registrationRepo, eventRepo, realtimeHub)
+	registrationService := service.NewRegistrationService(registrationRepo, eventRepo, realtimeHub, eventCache)
 	registrationHandler := handler.NewRegistrationHandler(registrationService)
 
 	sessionRepo := repository.NewSessionRepository(db)

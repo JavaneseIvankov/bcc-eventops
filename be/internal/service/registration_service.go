@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+
+	"github.com/bcc/eventops-be/internal/cache"
 	"github.com/bcc/eventops-be/internal/dto"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
@@ -21,10 +24,17 @@ type registrationService struct {
 	registrationRepo repository.RegistrationRepository
 	eventRepo        repository.EventRepository
 	hub              *ws.Hub
+	cache            *cache.EventCache
 }
 
-func NewRegistrationService(registrationRepo repository.RegistrationRepository, eventRepo repository.EventRepository, hub *ws.Hub) RegistrationService {
-	return &registrationService{registrationRepo: registrationRepo, eventRepo: eventRepo, hub: hub}
+func NewRegistrationService(registrationRepo repository.RegistrationRepository, eventRepo repository.EventRepository, hub *ws.Hub, eventCache *cache.EventCache) RegistrationService {
+	return &registrationService{registrationRepo: registrationRepo, eventRepo: eventRepo, hub: hub, cache: eventCache}
+}
+
+func (s *registrationService) invalidateEventCache(eventID uuid.UUID) {
+	ctx := context.Background()
+	s.cache.InvalidateList(ctx)
+	s.cache.InvalidateDetail(ctx, eventID)
 }
 
 func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Registration, error) {
@@ -33,6 +43,7 @@ func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Regis
 		return nil, err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registration.ID,
@@ -49,6 +60,7 @@ func (s *registrationService) CancelSelf(eventID, userID uuid.UUID) error {
 		return err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"status": models.RegistrationCancelled,
@@ -66,6 +78,7 @@ func (s *registrationService) CancelByID(eventID, registrationID uuid.UUID) erro
 		return err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registrationID,
@@ -105,6 +118,7 @@ func (s *registrationService) CheckIn(eventID, registrationID uuid.UUID) (*model
 		return nil, err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registration.ID,
 		"status":          registration.Status,
