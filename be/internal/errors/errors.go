@@ -22,4 +22,5 @@ var (
 	ErrInternal      = New(http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan pada server.")
 	ErrEmailExists   = New(http.StatusConflict, "EMAIL_ALREADY_EXISTS", "Email sudah terdaftar.")
 	ErrInvalidCreds  = New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Email atau password salah.")
+	ErrInvalidState  = New(http.StatusBadRequest, "INVALID_STATE", "Event sudah berstatus FINISHED, sesi tidak dapat diubah.")
 )

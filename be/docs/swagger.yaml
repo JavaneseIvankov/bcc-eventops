@@ -112,6 +112,27 @@ definitions:
       password:
         type: string
     type: object
+  github_com_bcc_eventops-be_internal_dto.SessionResponse:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      speaker:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.TokenResponse:
     properties:
       access_token:

@@ -616,6 +616,38 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_bcc_eventops-be_internal_dto.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "speaker": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.TokenResponse": {
             "type": "object",
             "properties": {
