@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu"
 import { Skeleton } from "@/shared/components/ui/skeleton"
+import { LogoImage } from "@/shared/components/logo"
 
 export default function MainLayout({
   children,
@@ -118,9 +119,7 @@ export default function MainLayout({
               href="/dashboard"
               className="flex items-center gap-2 font-bold tracking-tight text-foreground"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Calendar className="h-4 w-4" />
-              </div>
+              <LogoImage className="h-8 w-8"></LogoImage>
               <span className="text-lg">BCCin</span>
             </Link>
 
