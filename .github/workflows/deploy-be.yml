@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "be/**"
+      - "docker-compose.yml"
       - ".github/workflows/deploy-be.yml"
 
   workflow_dispatch:
@@ -33,25 +34,13 @@ jobs:
             echo "START BACKEND DEPLOYMENT"
             echo "================================"
 
-            # Environment
-            export PATH="/usr/local/go/bin:/home/dev/go/bin:/usr/local/bin:/usr/bin:/bin"
-
             echo "=== Server Information ==="
             echo "User: $(whoami)"
             echo "Home: $HOME"
-            echo "PATH: $PATH"
 
-            # Verify Go
-            echo "=== Go Environment ==="
-
-            if [ ! -x /usr/local/go/bin/go ]; then
-              echo "ERROR: Go binary not found!"
-              exit 1
-            fi
-
-            /usr/local/go/bin/go version
-            /usr/local/go/bin/go env GOROOT
-            /usr/local/go/bin/go env GOPATH
+            echo "=== Docker Environment ==="
+            docker --version
+            docker compose version
 
             # Navigate project
             echo "=== Navigate Project ==="
@@ -61,38 +50,14 @@ jobs:
             echo "=== Pull Latest Code ==="
             git pull origin main
 
-            # Navigate backend
-            cd be
+            # Build & restart backend container
+            echo "=== Build & Restart Backend Container ==="
+            docker compose up -d --build be
 
-            # Download dependencies
-            echo "=== Download Go Dependencies ==="
-            /usr/local/go/bin/go mod download
-
-            # Build application
-            echo "=== Build Backend ==="
-            /usr/local/go/bin/go build -o server ./cmd/api
-
-            # Verify binary
-            echo "=== Verify Build ==="
-
-            if [ ! -f server ]; then
-              echo "ERROR: Backend binary not found!"
-              exit 1
-            fi
-
-            ls -lh server
-
-            # Restart PM2
-            echo "=== Restart PM2 ==="
-
-            pm2 restart bcc-eventops-be --update-env
-
-            # Save PM2 process list
-            pm2 save
-
-            # Check PM2 status
-            echo "=== PM2 Status ==="
-            pm2 status
+            # Check container status
+            echo "=== Container Status ==="
+            docker compose ps be
+            docker compose logs --tail 50 be
 
             echo "================================"
             echo "BACKEND DEPLOYMENT SUCCESSFUL!"
