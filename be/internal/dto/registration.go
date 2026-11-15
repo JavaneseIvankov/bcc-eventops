@@ -29,6 +29,16 @@ func NewRegistrationResponse(reg *models.Registration) RegistrationResponse {
 	}
 }
 
+type ParticipantResponse struct {
+	RegistrationID uuid.UUID  `json:"registration_id"`
+	UserID         uuid.UUID  `json:"user_id"`
+	Name           string     `json:"name"`
+	Email          string     `json:"email"`
+	Status         string     `json:"status"`
+	RegisteredAt   time.Time  `json:"registered_at"`
+	CheckedInAt    *time.Time `json:"checked_in_at"`
+}
+
 func NewRegistrationResponseList(regs []models.Registration) []RegistrationResponse {
 	list := make([]RegistrationResponse, 0, len(regs))
 	for i := range regs {

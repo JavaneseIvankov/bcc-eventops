@@ -138,3 +138,73 @@ func (h *RegistrationHandler) ListMine(c *fiber.Ctx) error {
 	meta := response.Meta{Page: page, Limit: limit, TotalItems: int(total), TotalPages: totalPages}
 	return response.SuccessWithMeta(c, fiber.StatusOK, "Daftar pendaftaran saya berhasil diambil.", dto.NewRegistrationResponseList(registrations), meta)
 }
+
+// @Summary Mendapatkan daftar tabel peserta dengan pencarian & filter (COORDINATOR & COMMITTEE)
+// @Tags Operations
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Param page query int false "Halaman"
+// @Param limit query int false "Jumlah per halaman"
+// @Param search query string false "Cari berdasarkan nama atau email"
+// @Param status query string false "Filter status pendaftaran"
+// @Success 200 {array} dto.ParticipantResponse
+// @Router /events/{eventId}/participants [get]
+func (h *RegistrationHandler) ListParticipants(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	search := c.Query("search")
+	status := c.Query("status")
+
+	participants, total, err := h.registrationService.ListParticipants(eventID, page, limit, search, status)
+	if err != nil {
+		return err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	meta := response.Meta{Page: page, Limit: limit, TotalItems: int(total), TotalPages: totalPages}
+	return response.SuccessWithMeta(c, fiber.StatusOK, "Daftar peserta berhasil diambil.", participants, meta)
+}
+
+// @Summary Check-in peserta secara manual dari daftar peserta (COORDINATOR & COMMITTEE)
+// @Tags Registrations
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Param registrationId path string true "UUID Pendaftaran"
+// @Success 200 {object} dto.RegistrationResponse
+// @Failure 400 {string} string "Pendaftaran berstatus CANCELLED atau Event sudah FINISHED"
+// @Failure 409 {string} string "Peserta sudah berstatus CHECKED_IN sebelumnya"
+// @Router /events/{eventId}/registrations/{registrationId}/check-in [post]
+func (h *RegistrationHandler) CheckIn(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+	registrationID, err := uuid.Parse(c.Params("registrationId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	registration, err := h.registrationService.CheckIn(eventID, registrationID)
+	if err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusOK, "Check-in berhasil.", dto.NewRegistrationResponse(registration))
+}

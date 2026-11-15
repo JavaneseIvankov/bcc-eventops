@@ -35,3 +35,14 @@ func Error(c *fiber.Ctx, status int, code, message string) error {
 		},
 	})
 }
+
+func ErrorWithData(c *fiber.Ctx, status int, code, message string, data any) error {
+	return c.Status(status).JSON(fiber.Map{
+		"success": false,
+		"error": fiber.Map{
+			"code":    code,
+			"message": message,
+			"data":    data,
+		},
+	})
+}

@@ -12,6 +12,7 @@ type SessionRepository interface {
 	FindByEventIDSorted(eventID uuid.UUID) ([]models.Session, error)
 	Update(session *models.Session) error
 	Delete(id uuid.UUID) error
+	CountByStatus(eventID uuid.UUID) (map[string]int64, error)
 }
 
 type sessionRepository struct {
@@ -48,4 +49,26 @@ func (r *sessionRepository) Update(session *models.Session) error {
 
 func (r *sessionRepository) Delete(id uuid.UUID) error {
 	return r.db.Delete(&models.Session{}, "id = ?", id).Error
+}
+
+func (r *sessionRepository) CountByStatus(eventID uuid.UUID) (map[string]int64, error) {
+	type statusCount struct {
+		Status string
+		Count  int64
+	}
+
+	var rows []statusCount
+	if err := r.db.Model(&models.Session{}).
+		Select("status, count(*) as count").
+		Where("event_id = ?", eventID).
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	counts := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		counts[row.Status] = row.Count
+	}
+	return counts, nil
 }
