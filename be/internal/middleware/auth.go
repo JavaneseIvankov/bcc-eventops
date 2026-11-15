@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/bcc/eventops-be/internal/config"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/utils"
@@ -12,12 +14,13 @@ const UserIDContextKey = "userID"
 
 func RequireAuth(cfg *config.Config) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		token := c.Cookies("access_token")
-		if token == "" {
+		header := c.Get("Authorization")
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
 			return apperr.ErrUnauthorized
 		}
 
-		claims, err := utils.ParseToken(cfg.JWT.AccessSecret, token)
+		claims, err := utils.ParseToken(cfg.JWT.AccessSecret, parts[1])
 		if err != nil {
 			return apperr.ErrUnauthorized
 		}

@@ -8,6 +8,7 @@ import (
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/handler"
 	"github.com/bcc/eventops-be/internal/middleware"
+	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
 	"github.com/bcc/eventops-be/internal/response"
 	"github.com/bcc/eventops-be/internal/service"
@@ -26,7 +27,16 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWT)
-	authHandler := handler.NewAuthHandler(authService, cfg)
+	authHandler := handler.NewAuthHandler(authService)
+
+	eventRepo := repository.NewEventRepository(db)
+	registrationRepo := repository.NewRegistrationRepository(db)
+	committeeRepo := repository.NewCommitteeRepository(db)
+	eventService := service.NewEventService(eventRepo, registrationRepo)
+	eventHandler := handler.NewEventHandler(eventService)
+
+	registrationService := service.NewRegistrationService(registrationRepo)
+	registrationHandler := handler.NewRegistrationHandler(registrationService)
 
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
@@ -44,6 +54,23 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	auth.Get("/me", authMiddleware, authHandler.Me)
 	auth.Post("/refresh", authHandler.Refresh)
 	auth.Post("/logout", authHandler.Logout)
+
+	requireCoordinator := middleware.RequireEventRole(committeeRepo, models.RoleCoordinator)
+
+	events := api.Group("/events", authMiddleware)
+	events.Get("/", eventHandler.List)
+	events.Post("/", eventHandler.Create)
+	events.Get("/:eventId", eventHandler.Get)
+	events.Patch("/:eventId", requireCoordinator, eventHandler.Update)
+	events.Delete("/:eventId", requireCoordinator, eventHandler.Delete)
+
+	registrations := events.Group("/:eventId/registrations")
+	registrations.Post("/", registrationHandler.Register)
+	registrations.Post("/me/cancel", registrationHandler.CancelSelf)
+	registrations.Post("/:registrationId/cancel", requireCoordinator, registrationHandler.CancelByID)
+
+	me := api.Group("/me", authMiddleware)
+	me.Get("/registrations", registrationHandler.ListMine)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {
