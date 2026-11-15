@@ -1,7 +1,10 @@
-import { LoginInput } from "@/shared/repository/types"
+"use client"
+
 import { z } from "zod"
 import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useLogin } from "@/shared/repository/queries"
+import type { LoginInput } from "@/shared/repository/types"
 
 export const passwordSchema = z
   .string()
@@ -15,19 +18,36 @@ export const passwordSchema = z
   })
 
 const loginInputSchema = z.object({
-  name: z.string().min(3).max(20),
-  email: z.email(),
+  email: z.email({ message: "Please enter a valid email address" }),
   password: passwordSchema,
 })
-type TLoginInputSchema = z.infer<typeof loginInputSchema>
+
+export type TLoginInputSchema = z.infer<typeof loginInputSchema>
 
 export const useLoginForm = () => {
-  return useForm<TLoginInputSchema>({
+  const loginMut = useLogin()
+
+  const form = useForm<TLoginInputSchema>({
+    resolver: zodResolver(loginInputSchema),
     defaultValues: {
-      name: "",
       email: "",
       password: "",
     },
-    resolver: zodResolver(loginInputSchema),
   })
+
+  const onSubmit: SubmitHandler<TLoginInputSchema> = (values: LoginInput) => {
+    loginMut.mutate(values, {
+      onError: (err) => {
+        form.setError("root", {
+          message: err.error?.message || "Invalid email or password",
+        })
+      },
+    })
+  }
+
+  return {
+    form,
+    onSubmit: form.handleSubmit(onSubmit),
+    isPending: loginMut.isPending,
+  }
 }

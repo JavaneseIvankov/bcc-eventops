@@ -1,5 +1,7 @@
-import { cn } from "cn"
+"use client"
 
+import { Controller } from "react-hook-form"
+import { cn } from "@/shared/lib/utils"
 import { Button } from "@/shared/components/ui/button"
 import {
   Card,
@@ -11,16 +13,19 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@/shared/components/ui/field"
 import { Input } from "@/shared/components/ui/input"
+import { useLoginForm } from "../hooks/use-login-form"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const { form, onSubmit, isPending } = useLoginForm()
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -29,27 +34,63 @@ export function LoginForm({
           <CardDescription>Login with your account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form>
+          <form onSubmit={onSubmit} noValidate>
             <FieldGroup>
+              <Controller
+                name="email"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                    <Input
+                      {...field}
+                      id={field.name}
+                      type="email"
+                      placeholder="m@example.com"
+                      autoComplete="email"
+                      aria-invalid={fieldState.invalid}
+                      disabled={isPending}
+                    />
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+
+              <Controller
+                name="password"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <div className="flex items-center">
+                      <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                    </div>
+                    <Input
+                      {...field}
+                      id={field.name}
+                      type="password"
+                      autoComplete="current-password"
+                      aria-invalid={fieldState.invalid}
+                      disabled={isPending}
+                    />
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+
+              {form.formState.errors.root && (
+                <FieldError errors={[form.formState.errors.root]} />
+              )}
+
               <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                />
-              </Field>
-              <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                </div>
-                <Input id="password" type="password" required />
-              </Field>
-              <Field>
-                <Button type="submit">Login</Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? "Logging in..." : "Login"}
+                </Button>
                 <FieldDescription className="text-center">
-                  Don&apos;t have an account? <a href="#">Sign up</a>
+                  Don&apos;t have an account? <a href="/register">Sign up</a>
                 </FieldDescription>
               </Field>
             </FieldGroup>
