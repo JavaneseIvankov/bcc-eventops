@@ -28,9 +28,9 @@ export type TLoginInputSchema = z.infer<typeof loginInputSchema>
 export const useLoginForm = () => {
    const router = useRouter()
 
-   const loginMut = useLogin({
-     onSuccess: () => router.replace("/events"),
-   })
+  const loginMut = useLogin({
+    onSuccess: () => router.replace("/dashboard"),
+  })
 
   const form = useForm<TLoginInputSchema>({
     resolver: zodResolver(loginInputSchema),

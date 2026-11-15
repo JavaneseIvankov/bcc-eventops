@@ -51,6 +51,8 @@ import { Skeleton } from "@/shared/components/ui/skeleton"
 
 const PAGE_LIMIT = 9
 
+type StatusFilterValue = EventStatus | "ALL"
+
 const STATUS_BADGE_MAP: Record<
   EventStatus,
   {
@@ -116,9 +118,8 @@ export default function ExploreEventsPage() {
   // Filter & Pagination State
   const [searchInput, setSearchInput] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
-  const [statusFilter, setStatusFilter] = React.useState<EventStatus | "ALL">(
-    "ALL"
-  )
+  const [statusFilter, setStatusFilter] =
+    React.useState<StatusFilterValue>("ALL")
   const [managedOnly, setManagedOnly] = React.useState(false)
   const [page, setPage] = React.useState(1)
 
@@ -131,9 +132,12 @@ export default function ExploreEventsPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  // Reset ke halaman 1 ketika filter status atau managed_by_me berubah
-  const handleStatusChange = (val: string) => {
-    setStatusFilter(val as EventStatus | "ALL")
+  // Reset ke halaman 1 ketika filter status atau managed_by_me berubah.
+  // Select bisa mengirim null saat nilai dikosongkan, jadi kita guard di boundary
+  // alih-alih cast, supaya "ALL" tidak pernah bocor ke query.
+  const handleStatusChange = (val: StatusFilterValue | null) => {
+    if (!val) return
+    setStatusFilter(val)
     setPage(1)
   }
 
