@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< HEAD
 import * as React from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Calendar, Clock, Loader2, MapPin, Megaphone } from "lucide-react"
@@ -147,4 +148,10 @@ export default function EventDetailPage() {
       </div>
     </div>
   )
+=======
+import { EventDetailContainer } from "@/features/events/containers/event-detail-container"
+
+export default function EventDetailPage() {
+  return <EventDetailContainer />
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client"
 
 import * as React from "react"
@@ -136,4 +137,10 @@ export default function WorkspacePage() {
       </Tabs>
     </div>
   )
+=======
+import { WorkspaceContainer } from "@/features/workspace/containers/workspace-container"
+
+export default function WorkspacePage() {
+  return <WorkspaceContainer />
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }

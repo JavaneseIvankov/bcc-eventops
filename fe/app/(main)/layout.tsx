@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client"
 
 import * as React from "react"
@@ -256,4 +257,11 @@ export default function MainLayout({
       </main>
     </div>
   )
+=======
+import * as React from "react"
+import { MainShellContainer } from "@/features/main-shell/containers/main-shell-container"
+
+export default function MainLayout({ children }: { children: React.ReactNode }) {
+  return <MainShellContainer>{children}</MainShellContainer>
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }

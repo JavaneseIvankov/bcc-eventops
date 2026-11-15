@@ -48,11 +48,14 @@ interface LoginResponseData extends AuthTokenData {
   user: User
 }
 
+<<<<<<< HEAD
 const API_BASE_URL =
   process.env.INTERNAL_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8080/api/v1"
 
+=======
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 async function setAuthCookies(accessToken: string, refreshToken?: string) {
   const cookieStore = await cookies()
 
@@ -75,6 +78,7 @@ async function setAuthCookies(accessToken: string, refreshToken?: string) {
   }
 }
 
+<<<<<<< HEAD
 export async function getAccessTokenAction(): Promise<string | null> {
   const cookieStore = await cookies()
   return cookieStore.get("access_token")?.value ?? null
@@ -131,6 +135,10 @@ function extractBackendErrorMessage(err: any): string {
 
 // ============================================================================
 // BETTER-FETCH INSTANCE & WRAPPER (DENGAN AUTO-REFRESH & ERROR FORMATTING)
+=======
+// ============================================================================
+// BETTER-FETCH INSTANCE (SERVER-SIDE DENGAN BEARER TOKEN)
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 // ============================================================================
 
 const $fetch = createFetch({
@@ -147,6 +155,7 @@ const $fetch = createFetch({
     return context
   },
 })
+<<<<<<< HEAD
 
 async function apiFetch<T>(
   endpoint: string,
@@ -193,6 +202,8 @@ async function apiFetch<T>(
     throw new Error(message)
   }
 }
+=======
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 
 // ============================================================================
 // M1: AUTH ACTIONS
@@ -206,7 +217,11 @@ export async function registerAction(body: RegisterInput) {
 }
 
 export async function loginAction(body: LoginInput) {
+<<<<<<< HEAD
   const res = await apiFetch<ApiResponse<LoginResponseData>>("/auth/login", {
+=======
+  const res = await $fetch<ApiResponse<LoginResponseData>>("/auth/login", {
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
     method: "POST",
     body,
   })
@@ -220,7 +235,11 @@ export async function refreshTokenAction() {
   const cookieStore = await cookies()
   const refreshToken = cookieStore.get("refresh_token")?.value
 
+<<<<<<< HEAD
   const res = await apiFetch<ApiResponse<AuthTokenData>>("/auth/refresh", {
+=======
+  const res = await $fetch<ApiResponse<AuthTokenData>>("/auth/refresh", {
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
     method: "POST",
     body: { refresh_token: refreshToken },
   })
@@ -235,12 +254,19 @@ export async function logoutAction() {
   const refreshToken = cookieStore.get("refresh_token")?.value
 
   try {
+<<<<<<< HEAD
     await apiFetch<ApiResponse<null>>("/auth/logout", {
       method: "POST",
       body: { refresh_token: refreshToken },
     })
   } catch {
     // Abaikan error dari server saat logout
+=======
+    await $fetch<ApiResponse<null>>("/auth/logout", {
+      method: "POST",
+      body: { refresh_token: refreshToken },
+    })
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
   } finally {
     cookieStore.delete("access_token")
     cookieStore.delete("refresh_token")

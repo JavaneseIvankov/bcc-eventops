@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client"
 
 import * as React from "react"
@@ -123,4 +124,10 @@ export default function DashboardPage() {
       </Tabs>
     </div>
   )
+=======
+import { DashboardContainer } from "@/features/dashboard/containers/dashboard-container"
+
+export default function DashboardPage() {
+  return <DashboardContainer />
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }

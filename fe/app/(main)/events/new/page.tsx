@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client"
 
 import * as React from "react"
@@ -272,4 +273,10 @@ export default function CreateEventPage() {
       </Card>
     </div>
   )
+=======
+import { CreateEventContainer } from "@/features/events/containers/create-event-container"
+
+export default function CreateEventPage() {
+  return <CreateEventContainer />
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }
