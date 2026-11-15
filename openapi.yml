@@ -163,11 +163,11 @@ components:
           format: uuid
         name:
           type: string
-          example: Nadia Putri
+          example: Rafi Rahman
         email:
           type: string
           format: email
-          example: nadia@bcc.id
+          example: rafi@bcc.id
         created_at:
           type: string
           format: date-time

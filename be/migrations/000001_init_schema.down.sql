@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS announcements;
+DROP TABLE IF EXISTS registrations;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS invitations;
+DROP TABLE IF EXISTS committee_members;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS users;
