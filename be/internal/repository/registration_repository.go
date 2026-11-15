@@ -21,7 +21,9 @@ type RegistrationRepository interface {
 	FindByUserID(userID uuid.UUID, page, limit int, status string) ([]models.Registration, int64, error)
 	FindParticipants(eventID uuid.UUID, page, limit int, search, status string) ([]dto.ParticipantResponse, int64, error)
 	CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error)
+	CheckInByQRToken(eventID uuid.UUID, qrToken string) (*models.Registration, error)
 	CountByStatus(eventID uuid.UUID) (map[string]int64, error)
+	FindAllParticipants(eventID uuid.UUID, search, status string) ([]dto.ParticipantResponse, error)
 }
 
 type registrationRepository struct {
@@ -161,6 +163,29 @@ func (r *registrationRepository) FindParticipants(eventID uuid.UUID, page, limit
 	return participants, total, nil
 }
 
+func (r *registrationRepository) FindAllParticipants(eventID uuid.UUID, search, status string) ([]dto.ParticipantResponse, error) {
+	query := r.db.Table("registrations").
+		Joins("JOIN users ON users.id = registrations.user_id").
+		Where("registrations.event_id = ?", eventID)
+
+	if search != "" {
+		query = query.Where("users.name ILIKE ? OR users.email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if status != "" {
+		query = query.Where("registrations.status = ?", status)
+	}
+
+	var participants []dto.ParticipantResponse
+	err := query.Select(
+		"registrations.id AS registration_id, registrations.user_id, users.name, users.email, registrations.status, registrations.registered_at, registrations.checked_in_at",
+	).Order("registrations.registered_at DESC").Scan(&participants).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return participants, nil
+}
+
 func (r *registrationRepository) CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error) {
 	now := utils.NowUTC()
 
@@ -180,6 +205,18 @@ func (r *registrationRepository) CheckIn(eventID, registrationID uuid.UUID) (*mo
 		return nil, err
 	}
 	return &reg, nil
+}
+
+func (r *registrationRepository) CheckInByQRToken(eventID uuid.UUID, qrToken string) (*models.Registration, error) {
+	var reg models.Registration
+	if err := r.db.Where("event_id = ? AND qr_token = ?", eventID, qrToken).First(&reg).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperr.New(http.StatusNotFound, "NOT_FOUND", "QR token tidak ditemukan untuk event ini.")
+		}
+		return nil, err
+	}
+
+	return r.CheckIn(eventID, reg.ID)
 }
 
 func (r *registrationRepository) CountByStatus(eventID uuid.UUID) (map[string]int64, error) {
