@@ -1,0 +1,140 @@
+package handler
+
+import (
+	"math"
+	"strconv"
+
+	"github.com/bcc/eventops-be/internal/dto"
+	apperr "github.com/bcc/eventops-be/internal/errors"
+	"github.com/bcc/eventops-be/internal/middleware"
+	"github.com/bcc/eventops-be/internal/response"
+	"github.com/bcc/eventops-be/internal/service"
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+)
+
+type RegistrationHandler struct {
+	registrationService service.RegistrationService
+}
+
+func NewRegistrationHandler(registrationService service.RegistrationService) *RegistrationHandler {
+	return &RegistrationHandler{registrationService: registrationService}
+}
+
+// @Summary Mendaftarkan diri sendiri sebagai peserta pada event
+// @Tags Registrations
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Success 201 {object} dto.RegistrationResponse
+// @Failure 400 {string} string "Event tidak berstatus UPCOMING"
+// @Failure 409 {string} string "Kuota penuh atau sudah terdaftar aktif"
+// @Router /events/{eventId}/registrations [post]
+func (h *RegistrationHandler) Register(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	registration, err := h.registrationService.Register(eventID, userID)
+	if err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusCreated, "Pendaftaran berhasil.", dto.NewRegistrationResponse(registration))
+}
+
+// @Summary Membatalkan pendaftaran diri sendiri (Hanya saat event UPCOMING & belum CHECKED_IN)
+// @Tags Registrations
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Success 200 {string} string "Pendaftaran berhasil dibatalkan dan kuota dilepaskan"
+// @Failure 400 {string} string "Event sudah dimulai/selesai atau peserta sudah check-in"
+// @Router /events/{eventId}/registrations/me/cancel [post]
+func (h *RegistrationHandler) CancelSelf(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	if err := h.registrationService.CancelSelf(eventID, userID); err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusOK, "Pendaftaran berhasil dibatalkan.", nil)
+}
+
+// @Summary Membatalkan pendaftaran peserta lain (Khusus COORDINATOR)
+// @Tags Registrations
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Param registrationId path string true "UUID Pendaftaran"
+// @Success 200 {string} string "Pendaftaran peserta berhasil dibatalkan"
+// @Router /events/{eventId}/registrations/{registrationId}/cancel [post]
+func (h *RegistrationHandler) CancelByID(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+	registrationID, err := uuid.Parse(c.Params("registrationId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	if err := h.registrationService.CancelByID(eventID, registrationID); err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusOK, "Pendaftaran peserta berhasil dibatalkan.", nil)
+}
+
+// @Summary Melihat daftar pendaftaran event saya
+// @Tags Registrations
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Halaman"
+// @Param limit query int false "Jumlah per halaman"
+// @Param status query string false "Filter status pendaftaran"
+// @Success 200 {array} dto.RegistrationResponse
+// @Router /me/registrations [get]
+func (h *RegistrationHandler) ListMine(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	status := c.Query("status")
+
+	registrations, total, err := h.registrationService.ListMine(userID, page, limit, status)
+	if err != nil {
+		return err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	meta := response.Meta{Page: page, Limit: limit, TotalItems: int(total), TotalPages: totalPages}
+	return response.SuccessWithMeta(c, fiber.StatusOK, "Daftar pendaftaran saya berhasil diambil.", dto.NewRegistrationResponseList(registrations), meta)
+}

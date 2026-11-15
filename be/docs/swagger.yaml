@@ -112,6 +112,23 @@ definitions:
       password:
         type: string
     type: object
+  github_com_bcc_eventops-be_internal_dto.RegistrationResponse:
+    properties:
+      checked_in_at:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+      qr_token:
+        type: string
+      registered_at:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.TokenResponse:
     properties:
       access_token:
@@ -429,6 +446,113 @@ paths:
       summary: Mengubah informasi event atau kapasitas (Khusus COORDINATOR)
       tags:
       - Events
+  /events/{eventId}/registrations:
+    post:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse'
+        "400":
+          description: Event tidak berstatus UPCOMING
+          schema:
+            type: string
+        "409":
+          description: Kuota penuh atau sudah terdaftar aktif
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mendaftarkan diri sendiri sebagai peserta pada event
+      tags:
+      - Registrations
+  /events/{eventId}/registrations/{registrationId}/cancel:
+    post:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pendaftaran
+        in: path
+        name: registrationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pendaftaran peserta berhasil dibatalkan
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Membatalkan pendaftaran peserta lain (Khusus COORDINATOR)
+      tags:
+      - Registrations
+  /events/{eventId}/registrations/me/cancel:
+    post:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pendaftaran berhasil dibatalkan dan kuota dilepaskan
+          schema:
+            type: string
+        "400":
+          description: Event sudah dimulai/selesai atau peserta sudah check-in
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Membatalkan pendaftaran diri sendiri (Hanya saat event UPCOMING & belum
+        CHECKED_IN)
+      tags:
+      - Registrations
+  /me/registrations:
+    get:
+      parameters:
+      - description: Halaman
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman
+        in: query
+        name: limit
+        type: integer
+      - description: Filter status pendaftaran
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Melihat daftar pendaftaran event saya
+      tags:
+      - Registrations
 schemes:
 - http
 - https

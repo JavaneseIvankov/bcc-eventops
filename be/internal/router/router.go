@@ -35,6 +35,9 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	eventService := service.NewEventService(eventRepo, registrationRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
+	registrationService := service.NewRegistrationService(registrationRepo)
+	registrationHandler := handler.NewRegistrationHandler(registrationService)
+
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -60,6 +63,14 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	events.Get("/:eventId", eventHandler.Get)
 	events.Patch("/:eventId", requireCoordinator, eventHandler.Update)
 	events.Delete("/:eventId", requireCoordinator, eventHandler.Delete)
+
+	registrations := events.Group("/:eventId/registrations")
+	registrations.Post("/", registrationHandler.Register)
+	registrations.Post("/me/cancel", registrationHandler.CancelSelf)
+	registrations.Post("/:registrationId/cancel", requireCoordinator, registrationHandler.CancelByID)
+
+	me := api.Group("/me", authMiddleware)
+	me.Get("/registrations", registrationHandler.ListMine)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {

@@ -15,11 +15,13 @@ func New(status int, code, message string) *AppError {
 }
 
 var (
-	ErrUnauthorized  = New(http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
-	ErrForbidden     = New(http.StatusForbidden, "FORBIDDEN", "Anda tidak memiliki akses untuk aksi ini.")
-	ErrNotFound      = New(http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
-	ErrInvalidInput  = New(http.StatusBadRequest, "INVALID_INPUT", "Data yang dikirim tidak valid.")
-	ErrInternal      = New(http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan pada server.")
-	ErrEmailExists   = New(http.StatusConflict, "EMAIL_ALREADY_EXISTS", "Email sudah terdaftar.")
-	ErrInvalidCreds  = New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Email atau password salah.")
+	ErrUnauthorized      = New(http.StatusUnauthorized, "UNAUTHORIZED", "Autentikasi diperlukan.")
+	ErrForbidden         = New(http.StatusForbidden, "FORBIDDEN", "Anda tidak memiliki akses untuk aksi ini.")
+	ErrNotFound          = New(http.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
+	ErrInvalidInput      = New(http.StatusBadRequest, "INVALID_INPUT", "Data yang dikirim tidak valid.")
+	ErrInternal          = New(http.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan pada server.")
+	ErrEmailExists       = New(http.StatusConflict, "EMAIL_ALREADY_EXISTS", "Email sudah terdaftar.")
+	ErrInvalidCreds      = New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Email atau password salah.")
+	ErrQuotaExceeded     = New(http.StatusConflict, "QUOTA_EXCEEDED", "Kuota peserta untuk event ini sudah penuh.")
+	ErrAlreadyRegistered = New(http.StatusConflict, "ALREADY_REGISTERED", "Anda sudah terdaftar aktif pada event ini.")
 )
