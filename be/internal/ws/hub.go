@@ -2,6 +2,7 @@ package ws
 
 import (
 	"sync"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/google/uuid"
@@ -34,6 +35,10 @@ func (c *Client) WriteJSON(v any) error {
 }
 
 func (c *Client) Close() {
+	_ = c.Conn.WriteControl(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		time.Now().Add(time.Second))
+	_ = c.Conn.SetReadDeadline(time.Now())
 	_ = c.Conn.Close()
 }
 
