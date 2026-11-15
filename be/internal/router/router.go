@@ -3,7 +3,7 @@ package router
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/bcc/eventops-be/docs"
@@ -11,6 +11,7 @@ import (
 	"github.com/bcc/eventops-be/internal/config"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/handler"
+	"github.com/bcc/eventops-be/internal/metrics"
 	"github.com/bcc/eventops-be/internal/middleware"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
@@ -239,6 +240,7 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 
 	app.Get("/swagger/doc.json", serveSwaggerSpec)
 	app.Get("/swagger/*", swagger.HandlerDefault)
+	app.Get("/metrics", metrics.Handler())
 
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
@@ -250,7 +252,7 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 
 	redisClient, err := cache.NewClient(cfg.Redis)
 	if err != nil {
-		log.Printf("warning: gagal konek ke Redis, cache akan dilewati: %v", err)
+		slog.Warn("gagal konek ke Redis, cache akan dilewati", slog.String("error", err.Error()))
 	}
 	eventCache := cache.NewEventCache(redisClient)
 
@@ -365,6 +367,6 @@ func ErrorHandler(c *fiber.Ctx, err error) error {
 		return response.Error(c, fiber.StatusNotFound, "NOT_FOUND", "Data tidak ditemukan.")
 	}
 
-	log.Printf("unhandled error: %v", err)
+	slog.Error("unhandled error", slog.String("error", err.Error()))
 	return response.Error(c, fiber.StatusInternalServerError, "INTERNAL_ERROR", "Terjadi kesalahan pada server.")
 }
