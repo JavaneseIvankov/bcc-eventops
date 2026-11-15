@@ -1,0 +1,13 @@
+.env
+.env.*
+.git
+.gitignore
+.idea
+.vscode
+.DS_Store
+*.md
+bin/
+tmp/
+uploads/
+server
+seeder
