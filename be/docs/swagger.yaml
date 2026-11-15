@@ -11,6 +11,21 @@ definitions:
       user:
         $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
     type: object
+  github_com_bcc_eventops-be_internal_dto.CreateSessionRequest:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      location:
+        type: string
+      speaker:
+        type: string
+      start_time:
+        type: string
+      title:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.LoginRequest:
     properties:
       email:
@@ -37,6 +52,27 @@ definitions:
       password:
         type: string
     type: object
+  github_com_bcc_eventops-be_internal_dto.SessionResponse:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      speaker:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.TokenResponse:
     properties:
       access_token:
@@ -44,6 +80,26 @@ definitions:
       refresh_token:
         type: string
       token_type:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UpdateSessionRequest:
+    properties:
+      description:
+        type: string
+      end_time:
+        type: string
+      location:
+        type: string
+      speaker:
+        type: string
+      start_time:
+        type: string
+      title:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UpdateSessionStatusRequest:
+    properties:
+      status:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.UserResponse:
@@ -190,6 +246,165 @@ paths:
       summary: Registrasi akun pengguna baru
       tags:
       - Auth
+  /events/{eventId}/sessions:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.SessionResponse'
+            type: array
+        "404":
+          description: Event tidak ditemukan
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mendapatkan daftar sesi rundown terurut berdasarkan waktu mulai
+      tags:
+      - Sessions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Data sesi
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CreateSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.SessionResponse'
+        "403":
+          description: Hanya coordinator yang dapat menambahkan sesi
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Menambahkan sesi baru ke dalam rundown (Khusus COORDINATOR)
+      tags:
+      - Sessions
+  /events/{eventId}/sessions/{sessionId}:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Sesi
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sesi berhasil dihapus
+          schema:
+            type: string
+        "403":
+          description: Hanya coordinator yang dapat menghapus sesi
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Menghapus sesi dari rundown (Khusus COORDINATOR)
+      tags:
+      - Sessions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Sesi
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      - description: Data sesi yang diubah
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.SessionResponse'
+        "403":
+          description: Hanya coordinator yang dapat mengedit sesi
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mengedit detail sesi (Khusus COORDINATOR)
+      tags:
+      - Sessions
+  /events/{eventId}/sessions/{sessionId}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Sesi
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      - description: Status baru
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateSessionStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.SessionResponse'
+        "400":
+          description: Event sudah FINISHED sehingga status sesi tidak dapat diubah
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Memperbarui status sesi (COORDINATOR & COMMITTEE)
+      tags:
+      - Sessions
 schemes:
 - http
 - https

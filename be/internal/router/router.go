@@ -28,6 +28,12 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWT)
 	authHandler := handler.NewAuthHandler(authService)
 
+	eventRepo := repository.NewEventRepository(db)
+	sessionRepo := repository.NewSessionRepository(db)
+	committeeRepo := repository.NewCommitteeRepository(db)
+	sessionService := service.NewSessionService(sessionRepo, eventRepo, committeeRepo)
+	sessionHandler := handler.NewSessionHandler(sessionService)
+
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -44,6 +50,13 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	auth.Get("/me", authMiddleware, authHandler.Me)
 	auth.Post("/refresh", authHandler.Refresh)
 	auth.Post("/logout", authHandler.Logout)
+
+	sessions := api.Group("/events/:eventId/sessions", authMiddleware)
+	sessions.Get("/", sessionHandler.List)
+	sessions.Post("/", sessionHandler.Create)
+	sessions.Patch("/:sessionId", sessionHandler.Update)
+	sessions.Delete("/:sessionId", sessionHandler.Delete)
+	sessions.Patch("/:sessionId/status", sessionHandler.UpdateStatus)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {
