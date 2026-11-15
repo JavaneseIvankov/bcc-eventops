@@ -23,4 +23,6 @@ var (
 	ErrEmailExists   = New(http.StatusConflict, "EMAIL_ALREADY_EXISTS", "Email sudah terdaftar.")
 	ErrInvalidCreds  = New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Email atau password salah.")
 	ErrInvalidState  = New(http.StatusBadRequest, "INVALID_STATE", "Event sudah berstatus FINISHED, sesi tidak dapat diubah.")
+	ErrQuotaExceeded     = New(http.StatusConflict, "QUOTA_EXCEEDED", "Kuota peserta untuk event ini sudah penuh.")
+	ErrAlreadyRegistered = New(http.StatusConflict, "ALREADY_REGISTERED", "Anda sudah terdaftar aktif pada event ini.")
 )
