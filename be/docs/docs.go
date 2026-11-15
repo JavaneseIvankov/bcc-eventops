@@ -611,6 +611,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/events/{eventId}/check-in/qr": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Registrations"
+                ],
+                "summary": "Check-in peserta dengan memindai QR Token (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "QR token peserta",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.CheckInByQRRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "QR token tidak ditemukan",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Peserta sudah berstatus CHECKED_IN sebelumnya",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/events/{eventId}/committees": {
             "get": {
                 "security": [
@@ -964,6 +1021,51 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.ParticipantResponse"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/events/{eventId}/participants/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "Operations"
+                ],
+                "summary": "Ekspor rekap peserta dan kehadiran ke CSV (COORDINATOR \u0026 COMMITTEE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cari berdasarkan nama atau email",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter status pendaftaran",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File CSV",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }
@@ -1338,6 +1440,84 @@ const docTemplate = `{
                 }
             }
         },
+        "/events/{eventId}/sessions/{sessionId}/bookmark": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Bookmark sebuah sesi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID Sesi",
+                        "name": "sessionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Sesi berhasil di-bookmark",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Hapus bookmark sebuah sesi",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID Event",
+                        "name": "eventId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID Sesi",
+                        "name": "sessionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bookmark berhasil dihapus",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/events/{eventId}/sessions/{sessionId}/status": {
             "patch": {
                 "security": [
@@ -1462,6 +1642,33 @@ const docTemplate = `{
                 }
             }
         },
+        "/me/bookmarks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Daftar sesi yang saya bookmark",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.BookmarkedSessionResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/me/invitations": {
             "get": {
                 "security": [
@@ -1555,6 +1762,51 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/uploads": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Uploads"
+                ],
+                "summary": "Upload file gambar poster event",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File gambar poster (maks. 5MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "File tidak valid",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1598,6 +1850,40 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.BookmarkedSessionResponse": {
+            "type": "object",
+            "properties": {
+                "bookmarked_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "event_id": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.CheckInByQRRequest": {
+            "type": "object",
+            "properties": {
+                "qr_token": {
+                    "type": "string"
                 }
             }
         },
