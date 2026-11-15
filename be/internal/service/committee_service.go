@@ -8,6 +8,7 @@ import (
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
+	"github.com/bcc/eventops-be/internal/ws"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -28,13 +29,15 @@ type committeeService struct {
 	invitationRepo repository.InvitationRepository
 	committeeRepo  repository.CommitteeRepository
 	userRepo       repository.UserRepository
+	hub            *ws.Hub
 }
 
-func NewCommitteeService(invitationRepo repository.InvitationRepository, committeeRepo repository.CommitteeRepository, userRepo repository.UserRepository) CommitteeService {
+func NewCommitteeService(invitationRepo repository.InvitationRepository, committeeRepo repository.CommitteeRepository, userRepo repository.UserRepository, hub *ws.Hub) CommitteeService {
 	return &committeeService{
 		invitationRepo: invitationRepo,
 		committeeRepo:  committeeRepo,
 		userRepo:       userRepo,
+		hub:            hub,
 	}
 }
 
@@ -154,6 +157,10 @@ func (s *committeeService) UpdateMemberRole(eventID, targetUserID uuid.UUID, new
 		return nil, err
 	}
 
+	s.hub.CloseUserConnections(eventID, ws.RoomCommittee, targetUserID, ws.NewMessage(ws.EventAccessRevoked, map[string]any{
+		"reason": "ROLE_CHANGED",
+	}))
+
 	return member, nil
 }
 
@@ -181,5 +188,13 @@ func (s *committeeService) exitCommittee(eventID, userID uuid.UUID) error {
 		}
 	}
 
-	return s.committeeRepo.Delete(eventID, userID)
+	if err := s.committeeRepo.Delete(eventID, userID); err != nil {
+		return err
+	}
+
+	s.hub.CloseUserConnections(eventID, ws.RoomCommittee, userID, ws.NewMessage(ws.EventAccessRevoked, map[string]any{
+		"reason": "REMOVED_FROM_COMMITTEE",
+	}))
+
+	return nil
 }

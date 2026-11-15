@@ -4,6 +4,7 @@ import (
 	"github.com/bcc/eventops-be/internal/dto"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
+	"github.com/bcc/eventops-be/internal/ws"
 	"github.com/google/uuid"
 )
 
@@ -18,22 +19,64 @@ type RegistrationService interface {
 
 type registrationService struct {
 	registrationRepo repository.RegistrationRepository
+	eventRepo        repository.EventRepository
+	hub              *ws.Hub
 }
 
-func NewRegistrationService(registrationRepo repository.RegistrationRepository) RegistrationService {
-	return &registrationService{registrationRepo: registrationRepo}
+func NewRegistrationService(registrationRepo repository.RegistrationRepository, eventRepo repository.EventRepository, hub *ws.Hub) RegistrationService {
+	return &registrationService{registrationRepo: registrationRepo, eventRepo: eventRepo, hub: hub}
 }
 
 func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Registration, error) {
-	return s.registrationRepo.RegisterParticipant(eventID, userID)
+	registration, err := s.registrationRepo.RegisterParticipant(eventID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.broadcastQuota(eventID)
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
+		"registration_id": registration.ID,
+		"status":          registration.Status,
+	}))
+	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantRegistered, dto.NewRegistrationResponse(registration)))
+	s.broadcastDashboard(eventID)
+
+	return registration, nil
 }
 
 func (s *registrationService) CancelSelf(eventID, userID uuid.UUID) error {
-	return s.registrationRepo.CancelSelf(eventID, userID)
+	if err := s.registrationRepo.CancelSelf(eventID, userID); err != nil {
+		return err
+	}
+
+	s.broadcastQuota(eventID)
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
+		"status": models.RegistrationCancelled,
+	}))
+	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantCancelled, map[string]any{
+		"user_id": userID,
+	}))
+	s.broadcastDashboard(eventID)
+
+	return nil
 }
 
 func (s *registrationService) CancelByID(eventID, registrationID uuid.UUID) error {
-	return s.registrationRepo.CancelByID(eventID, registrationID)
+	if err := s.registrationRepo.CancelByID(eventID, registrationID); err != nil {
+		return err
+	}
+
+	s.broadcastQuota(eventID)
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
+		"registration_id": registrationID,
+		"status":          models.RegistrationCancelled,
+	}))
+	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantCancelled, map[string]any{
+		"registration_id": registrationID,
+	}))
+	s.broadcastDashboard(eventID)
+
+	return nil
 }
 
 func (s *registrationService) ListMine(userID uuid.UUID, page, limit int, status string) ([]models.Registration, int64, error) {
@@ -57,5 +100,35 @@ func (s *registrationService) ListParticipants(eventID uuid.UUID, page, limit in
 }
 
 func (s *registrationService) CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error) {
-	return s.registrationRepo.CheckIn(eventID, registrationID)
+	registration, err := s.registrationRepo.CheckIn(eventID, registrationID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
+		"registration_id": registration.ID,
+		"status":          registration.Status,
+	}))
+	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantCheckedIn, dto.NewRegistrationResponse(registration)))
+	s.broadcastDashboard(eventID)
+
+	return registration, nil
+}
+
+func (s *registrationService) broadcastQuota(eventID uuid.UUID) {
+	event, err := s.eventRepo.FindByID(eventID)
+	if err != nil {
+		return
+	}
+	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventQuotaUpdated, map[string]any{
+		"quota_total":     event.QuotaTotal,
+		"quota_filled":    event.QuotaFilled,
+		"quota_available": event.QuotaAvailable(),
+	}))
+}
+
+func (s *registrationService) broadcastDashboard(eventID uuid.UUID) {
+	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventDashboardUpdated, map[string]any{
+		"event_id": eventID,
+	}))
 }
