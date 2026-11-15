@@ -1,10 +1,31 @@
 basePath: /api/v1
 definitions:
+  github_com_bcc_eventops-be_internal_dto.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
+    type: object
   github_com_bcc_eventops-be_internal_dto.LoginRequest:
     properties:
       email:
         type: string
       password:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.RefreshRequest:
+    properties:
+      refresh_token:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.RegisterRequest:
@@ -14,6 +35,15 @@ definitions:
       name:
         type: string
       password:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.UserResponse:
@@ -32,9 +62,9 @@ info:
   contact:
     email: dev@bcc.id
     name: BCC EventOps Team
-  description: Spesifikasi REST API untuk BCC EventOps. Auth menggunakan HTTP-Only
-    Cookie (access_token & refresh_token). Konvensi JSON snake_case, ID UUID v4, waktu
-    ISO 8601.
+  description: Spesifikasi REST API untuk BCC EventOps. Auth menggunakan Bearer Token
+    (access_token & refresh_token dikembalikan lewat response body). Konvensi JSON
+    snake_case, ID UUID v4, waktu ISO 8601.
   termsOfService: http://swagger.io/terms/
   title: BCC EventOps API
   version: 1.0.0
@@ -56,7 +86,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.AuthResponse'
         "400":
           description: Data yang dikirim tidak valid
           schema:
@@ -70,6 +100,14 @@ paths:
       - Auth
   /auth/logout:
     post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token yang akan di-revoke
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.LogoutRequest'
       produces:
       - application/json
       responses:
@@ -77,7 +115,7 @@ paths:
           description: Logout berhasil
           schema:
             type: string
-      summary: Logout dan menghapus cookie autentikasi
+      summary: Logout dan revoke refresh token
       tags:
       - Auth
   /auth/me:
@@ -94,24 +132,33 @@ paths:
           schema:
             type: string
       security:
-      - cookieAuth: []
+      - BearerAuth: []
       summary: Mendapatkan profil pengguna yang sedang login
       tags:
       - Auth
   /auth/refresh:
     post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Token berhasil diperbarui
+          description: OK
           schema:
-            type: string
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.TokenResponse'
         "401":
           description: Autentikasi diperlukan
           schema:
             type: string
-      summary: Memperbarui access_token menggunakan refresh_token dari cookie
+      summary: Memperbarui access_token menggunakan refresh_token
       tags:
       - Auth
   /auth/register:
@@ -147,9 +194,9 @@ schemes:
 - http
 - https
 securityDefinitions:
-  cookieAuth:
-    description: HTTP-Only Cookie berisi JWT Access Token
-    in: cookie
-    name: access_token
+  BearerAuth:
+    description: 'Masukkan token dengan format: Bearer {access_token}'
+    in: header
+    name: Authorization
     type: apiKey
 swagger: "2.0"

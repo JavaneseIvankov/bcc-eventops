@@ -71,3 +71,48 @@ func NewUserResponse(user *models.User) UserResponse {
 		CreatedAt: user.CreatedAt,
 	}
 }
+
+type AuthResponse struct {
+	User         UserResponse `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+	TokenType    string       `json:"token_type"`
+}
+
+func NewAuthResponse(user *models.User, accessToken, refreshToken string) AuthResponse {
+	return AuthResponse{
+		User:         NewUserResponse(user),
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	}
+}
+
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+}
+
+func NewTokenResponse(accessToken, refreshToken string) TokenResponse {
+	return TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	}
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+func (r *RefreshRequest) Validate() error {
+	if strings.TrimSpace(r.RefreshToken) == "" {
+		return apperr.New(http.StatusBadRequest, "INVALID_INPUT", "refresh_token wajib diisi.")
+	}
+	return nil
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}

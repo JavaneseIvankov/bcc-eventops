@@ -46,7 +46,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse"
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.AuthResponse"
                         }
                     },
                     "400": {
@@ -66,13 +66,26 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout dan menghapus cookie autentikasi",
+                "summary": "Logout dan revoke refresh token",
+                "parameters": [
+                    {
+                        "description": "Refresh token yang akan di-revoke",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.LogoutRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Logout berhasil",
@@ -87,7 +100,7 @@ const docTemplate = `{
             "get": {
                 "security": [
                     {
-                        "cookieAuth": []
+                        "BearerAuth": []
                     }
                 ],
                 "produces": [
@@ -115,18 +128,32 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Memperbarui access_token menggunakan refresh_token dari cookie",
+                "summary": "Memperbarui access_token menggunakan refresh_token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.RefreshRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Token berhasil diperbarui",
+                        "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.TokenResponse"
                         }
                     },
                     "401": {
@@ -185,6 +212,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_bcc_eventops-be_internal_dto.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.LoginRequest": {
             "type": "object",
             "properties": {
@@ -192,6 +236,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.LogoutRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.RefreshRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
                     "type": "string"
                 }
             }
@@ -206,6 +266,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.TokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
                     "type": "string"
                 }
             }
@@ -229,11 +303,11 @@ const docTemplate = `{
         }
     },
     "securityDefinitions": {
-        "cookieAuth": {
-            "description": "HTTP-Only Cookie berisi JWT Access Token",
+        "BearerAuth": {
+            "description": "Masukkan token dengan format: Bearer {access_token}",
             "type": "apiKey",
-            "name": "access_token",
-            "in": "cookie"
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
@@ -245,7 +319,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/api/v1",
 	Schemes:          []string{"http", "https"},
 	Title:            "BCC EventOps API",
-	Description:      "Spesifikasi REST API untuk BCC EventOps. Auth menggunakan HTTP-Only Cookie (access_token & refresh_token). Konvensi JSON snake_case, ID UUID v4, waktu ISO 8601.",
+	Description:      "Spesifikasi REST API untuk BCC EventOps. Auth menggunakan Bearer Token (access_token & refresh_token dikembalikan lewat response body). Konvensi JSON snake_case, ID UUID v4, waktu ISO 8601.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"github.com/bcc/eventops-be/internal/config"
 	"github.com/bcc/eventops-be/internal/dto"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/middleware"
@@ -12,11 +11,10 @@ import (
 
 type AuthHandler struct {
 	authService service.AuthService
-	cfg         *config.Config
 }
 
-func NewAuthHandler(authService service.AuthService, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{authService: authService, cfg: cfg}
+func NewAuthHandler(authService service.AuthService) *AuthHandler {
+	return &AuthHandler{authService: authService}
 }
 
 // @Summary Registrasi akun pengguna baru
@@ -50,7 +48,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body dto.LoginRequest true "Kredensial login"
-// @Success 200 {object} dto.UserResponse
+// @Success 200 {object} dto.AuthResponse
 // @Failure 400 {string} string "Data yang dikirim tidak valid"
 // @Failure 401 {string} string "Email atau password salah"
 // @Router /auth/login [post]
@@ -68,15 +66,13 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return err
 	}
 
-	setAuthCookies(c, h.cfg, accessToken, refreshToken)
-
-	return response.Success(c, fiber.StatusOK, "Login berhasil.", dto.NewUserResponse(user))
+	return response.Success(c, fiber.StatusOK, "Login berhasil.", dto.NewAuthResponse(user, accessToken, refreshToken))
 }
 
 // @Summary Mendapatkan profil pengguna yang sedang login
 // @Tags Auth
 // @Produce json
-// @Security cookieAuth
+// @Security BearerAuth
 // @Success 200 {object} dto.UserResponse
 // @Failure 401 {string} string "Autentikasi diperlukan"
 // @Router /auth/me [get]
@@ -94,38 +90,45 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	return response.Success(c, fiber.StatusOK, "Profil pengguna berhasil diambil.", dto.NewUserResponse(user))
 }
 
-// @Summary Memperbarui access_token menggunakan refresh_token dari cookie
+// @Summary Memperbarui access_token menggunakan refresh_token
 // @Tags Auth
+// @Accept json
 // @Produce json
-// @Success 200 {string} string "Token berhasil diperbarui"
+// @Param request body dto.RefreshRequest true "Refresh token"
+// @Success 200 {object} dto.TokenResponse
 // @Failure 401 {string} string "Autentikasi diperlukan"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
-	refreshToken := c.Cookies("refresh_token")
+	var req dto.RefreshRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.ErrInvalidInput
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
 
-	accessToken, newRefreshToken, err := h.authService.Refresh(refreshToken)
+	accessToken, newRefreshToken, err := h.authService.Refresh(req.RefreshToken)
 	if err != nil {
 		return err
 	}
 
-	setAuthCookies(c, h.cfg, accessToken, newRefreshToken)
-
-	return response.Success(c, fiber.StatusOK, "Token berhasil diperbarui.", nil)
+	return response.Success(c, fiber.StatusOK, "Token berhasil diperbarui.", dto.NewTokenResponse(accessToken, newRefreshToken))
 }
 
-// @Summary Logout dan menghapus cookie autentikasi
+// @Summary Logout dan revoke refresh token
 // @Tags Auth
+// @Accept json
 // @Produce json
+// @Param request body dto.LogoutRequest false "Refresh token yang akan di-revoke"
 // @Success 200 {string} string "Logout berhasil"
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
-	refreshToken := c.Cookies("refresh_token")
+	var req dto.LogoutRequest
+	_ = c.BodyParser(&req)
 
-	if err := h.authService.Logout(refreshToken); err != nil {
+	if err := h.authService.Logout(req.RefreshToken); err != nil {
 		return err
 	}
-
-	clearAuthCookies(c, h.cfg)
 
 	return response.Success(c, fiber.StatusOK, "Logout berhasil.", nil)
 }

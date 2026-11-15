@@ -5,7 +5,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Spesifikasi REST API untuk BCC EventOps. Auth menggunakan HTTP-Only Cookie (access_token \u0026 refresh_token). Konvensi JSON snake_case, ID UUID v4, waktu ISO 8601.",
+        "description": "Spesifikasi REST API untuk BCC EventOps. Auth menggunakan Bearer Token (access_token \u0026 refresh_token dikembalikan lewat response body). Konvensi JSON snake_case, ID UUID v4, waktu ISO 8601.",
         "title": "BCC EventOps API",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
@@ -44,7 +44,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse"
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.AuthResponse"
                         }
                     },
                     "400": {
@@ -64,13 +64,26 @@
         },
         "/auth/logout": {
             "post": {
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Logout dan menghapus cookie autentikasi",
+                "summary": "Logout dan revoke refresh token",
+                "parameters": [
+                    {
+                        "description": "Refresh token yang akan di-revoke",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.LogoutRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Logout berhasil",
@@ -85,7 +98,7 @@
             "get": {
                 "security": [
                     {
-                        "cookieAuth": []
+                        "BearerAuth": []
                     }
                 ],
                 "produces": [
@@ -113,18 +126,32 @@
         },
         "/auth/refresh": {
             "post": {
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Memperbarui access_token menggunakan refresh_token dari cookie",
+                "summary": "Memperbarui access_token menggunakan refresh_token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.RefreshRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Token berhasil diperbarui",
+                        "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.TokenResponse"
                         }
                     },
                     "401": {
@@ -183,6 +210,23 @@
         }
     },
     "definitions": {
+        "github_com_bcc_eventops-be_internal_dto.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse"
+                }
+            }
+        },
         "github_com_bcc_eventops-be_internal_dto.LoginRequest": {
             "type": "object",
             "properties": {
@@ -190,6 +234,22 @@
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.LogoutRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.RefreshRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
                     "type": "string"
                 }
             }
@@ -204,6 +264,20 @@
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_bcc_eventops-be_internal_dto.TokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
                     "type": "string"
                 }
             }
@@ -227,11 +301,11 @@
         }
     },
     "securityDefinitions": {
-        "cookieAuth": {
-            "description": "HTTP-Only Cookie berisi JWT Access Token",
+        "BearerAuth": {
+            "description": "Masukkan token dengan format: Bearer {access_token}",
             "type": "apiKey",
-            "name": "access_token",
-            "in": "cookie"
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

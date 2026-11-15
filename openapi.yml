@@ -5,7 +5,7 @@ info:
     Spesifikasi REST API untuk **BCC EventOps** (Internal Hackathon).
     - **Backend:** Go Fiber
     - **Frontend:** Next.js
-    - **Auth:** HTTP-Only Cookie (`access_token` & `refresh_token`)
+    - **Auth:** Bearer Token (`access_token` & `refresh_token` dikembalikan lewat response body)
     - **Konvensi JSON:** `snake_case`, ID menggunakan `UUID v4`, waktu menggunakan `ISO 8601`.
   version: 1.0.0
 
@@ -33,11 +33,11 @@ tags:
 
 components:
   securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: access_token
-      description: HTTP-Only Cookie yang berisi JWT Access Token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Kirim access_token lewat header `Authorization: Bearer {access_token}`"
 
   parameters:
     EventIdParam:
@@ -171,6 +171,30 @@ components:
         created_at:
           type: string
           format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
 
     EventSummary:
       type: object
@@ -428,7 +452,7 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
 
 security:
-  - cookieAuth: []
+  - bearerAuth: []
 
 paths:
   # ==================== AUTH ====================
@@ -456,12 +480,7 @@ paths:
                   minLength: 8
       responses:
         '201':
-          description: Registrasi berhasil dan langsung mengatur cookie autentikasi
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: access_token=eyJ...; Path=/; HttpOnly; SameSite=Lax
+          description: Registrasi berhasil
           content:
             application/json:
               schema:
@@ -501,11 +520,7 @@ paths:
                   type: string
       responses:
         '200':
-          description: Login berhasil, mengatur HTTP-Only cookie `access_token` dan `refresh_token`
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
+          description: Login berhasil, mengembalikan access_token & refresh_token lewat response body
           content:
             application/json:
               schema:
@@ -517,14 +532,25 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: '#/components/schemas/User'
+                    $ref: '#/components/schemas/AuthResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
 
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Memperbarui access_token menggunakan refresh_token dari cookie
+      summary: Memperbarui access_token menggunakan refresh_token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
       responses:
         '200':
           description: Token berhasil diperbarui
@@ -539,14 +565,24 @@ paths:
                   message:
                     type: string
                   data:
-                    nullable: true
+                    $ref: '#/components/schemas/TokenResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
 
   /auth/logout:
     post:
       tags: [Auth]
-      summary: Logout dan menghapus cookie autentikasi
+      summary: Logout dan revoke refresh_token
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
       responses:
         '200':
           description: Berhasil logout

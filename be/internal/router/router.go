@@ -26,7 +26,7 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWT)
-	authHandler := handler.NewAuthHandler(authService, cfg)
+	authHandler := handler.NewAuthHandler(authService)
 
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
