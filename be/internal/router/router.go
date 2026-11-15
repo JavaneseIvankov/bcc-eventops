@@ -6,8 +6,13 @@ import (
 
 	"github.com/bcc/eventops-be/internal/config"
 	apperr "github.com/bcc/eventops-be/internal/errors"
+	"github.com/bcc/eventops-be/internal/handler"
+	"github.com/bcc/eventops-be/internal/middleware"
+	"github.com/bcc/eventops-be/internal/repository"
 	"github.com/bcc/eventops-be/internal/response"
+	"github.com/bcc/eventops-be/internal/service"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/swagger"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +20,13 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": cfg.App.Name})
 	})
+
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
+	userRepo := repository.NewUserRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWT)
+	authHandler := handler.NewAuthHandler(authService, cfg)
 
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
@@ -24,7 +36,14 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 		})
 	})
 
-	_ = db
+	authMiddleware := middleware.RequireAuth(cfg)
+
+	auth := api.Group("/auth")
+	auth.Post("/register", authHandler.Register)
+	auth.Post("/login", authHandler.Login)
+	auth.Get("/me", authMiddleware, authHandler.Me)
+	auth.Post("/refresh", authHandler.Refresh)
+	auth.Post("/logout", authHandler.Logout)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {

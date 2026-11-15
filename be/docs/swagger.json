@@ -1,0 +1,28 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Spesifikasi REST API untuk BCC EventOps. Auth menggunakan HTTP-Only Cookie (access_token \u0026 refresh_token). Konvensi JSON snake_case, ID UUID v4, waktu ISO 8601.",
+        "title": "BCC EventOps API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "BCC EventOps Team",
+            "email": "dev@bcc.id"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {},
+    "securityDefinitions": {
+        "cookieAuth": {
+            "description": "HTTP-Only Cookie berisi JWT Access Token",
+            "type": "apiKey",
+            "name": "access_token",
+            "in": "cookie"
+        }
+    }
+}

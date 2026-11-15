@@ -1,0 +1,23 @@
+basePath: /api/v1
+host: localhost:8080
+info:
+  contact:
+    email: dev@bcc.id
+    name: BCC EventOps Team
+  description: Spesifikasi REST API untuk BCC EventOps. Auth menggunakan HTTP-Only
+    Cookie (access_token & refresh_token). Konvensi JSON snake_case, ID UUID v4, waktu
+    ISO 8601.
+  termsOfService: http://swagger.io/terms/
+  title: BCC EventOps API
+  version: 1.0.0
+paths: {}
+schemes:
+- http
+- https
+securityDefinitions:
+  cookieAuth:
+    description: HTTP-Only Cookie berisi JWT Access Token
+    in: cookie
+    name: access_token
+    type: apiKey
+swagger: "2.0"
