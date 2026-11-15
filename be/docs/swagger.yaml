@@ -28,6 +28,28 @@ definitions:
       user:
         $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
     type: object
+  github_com_bcc_eventops-be_internal_dto.BookmarkedSessionResponse:
+    properties:
+      bookmarked_at:
+        type: string
+      end_time:
+        type: string
+      event_id:
+        type: string
+      session_id:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.CheckInByQRRequest:
+    properties:
+      qr_token:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse:
     properties:
       email:
@@ -739,6 +761,42 @@ paths:
       summary: Mengedit pengumuman (COORDINATOR & COMMITTEE)
       tags:
       - Operations
+  /events/{eventId}/check-in/qr:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: QR token peserta
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CheckInByQRRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.RegistrationResponse'
+        "404":
+          description: QR token tidak ditemukan
+          schema:
+            type: string
+        "409":
+          description: Peserta sudah berstatus CHECKED_IN sebelumnya
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Check-in peserta dengan memindai QR Token (COORDINATOR & COMMITTEE)
+      tags:
+      - Registrations
   /events/{eventId}/committees:
     get:
       parameters:
@@ -963,6 +1021,34 @@ paths:
       - BearerAuth: []
       summary: Mendapatkan daftar tabel peserta dengan pencarian & filter (COORDINATOR
         & COMMITTEE)
+      tags:
+      - Operations
+  /events/{eventId}/participants/export:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Cari berdasarkan nama atau email
+        in: query
+        name: search
+        type: string
+      - description: Filter status pendaftaran
+        in: query
+        name: status
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: File CSV
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Ekspor rekap peserta dan kehadiran ke CSV (COORDINATOR & COMMITTEE)
       tags:
       - Operations
   /events/{eventId}/registrations:
@@ -1198,6 +1284,55 @@ paths:
       summary: Mengedit detail sesi (Khusus COORDINATOR)
       tags:
       - Sessions
+  /events/{eventId}/sessions/{sessionId}/bookmark:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Sesi
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bookmark berhasil dihapus
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Hapus bookmark sebuah sesi
+      tags:
+      - Sessions
+    post:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Sesi
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Sesi berhasil di-bookmark
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Bookmark sebuah sesi
+      tags:
+      - Sessions
   /events/{eventId}/sessions/{sessionId}/status:
     patch:
       consumes:
@@ -1275,6 +1410,22 @@ paths:
       summary: Menolak undangan kepanitiaan
       tags:
       - Committees
+  /me/bookmarks:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.BookmarkedSessionResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Daftar sesi yang saya bookmark
+      tags:
+      - Sessions
   /me/invitations:
     get:
       parameters:
@@ -1334,6 +1485,34 @@ paths:
       summary: Melihat daftar pendaftaran event saya
       tags:
       - Registrations
+  /uploads:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: File gambar poster (maks. 5MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: File tidak valid
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Upload file gambar poster event
+      tags:
+      - Uploads
 schemes:
 - http
 - https

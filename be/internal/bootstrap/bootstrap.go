@@ -38,6 +38,7 @@ func New() (*fiber.App, *config.Config, error) {
 		AppName:               cfg.App.Name,
 		DisableStartupMessage: true,
 		ErrorHandler:          router.ErrorHandler,
+		BodyLimit:             6 * 1024 * 1024,
 	})
 
 	app.Use(recover.New())
@@ -48,6 +49,8 @@ func New() (*fiber.App, *config.Config, error) {
 		AllowCredentials: true,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 	}))
+
+	app.Static("/uploads", "./uploads")
 
 	router.Register(app, db, cfg)
 
