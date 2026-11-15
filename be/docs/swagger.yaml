@@ -11,6 +11,30 @@ definitions:
       user:
         $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
     type: object
+  github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse:
+    properties:
+      email:
+        type: string
+      joined_at:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.CommitteeOverviewResponse:
+    properties:
+      invitations:
+        items:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.InvitationResponse'
+        type: array
+      members:
+        items:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse'
+        type: array
+    type: object
   github_com_bcc_eventops-be_internal_dto.CreateEventRequest:
     properties:
       end_time:
@@ -116,6 +140,32 @@ definitions:
       start_time:
         type: string
       status:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.InvitationResponse:
+    properties:
+      created_at:
+        type: string
+      event_id:
+        type: string
+      id:
+        type: string
+      invitee_email:
+        type: string
+      invitee_name:
+        type: string
+      invitee_user_id:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.InviteRequest:
+    properties:
+      email:
+        type: string
+      role:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.LoginRequest:
@@ -236,6 +286,11 @@ definitions:
       start_time:
         type: string
       status:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UpdateMemberRoleRequest:
+    properties:
+      role:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.UpdateSessionRequest:
@@ -547,6 +602,115 @@ paths:
       summary: Mengubah informasi event atau kapasitas (Khusus COORDINATOR)
       tags:
       - Events
+  /events/{eventId}/committees:
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CommitteeOverviewResponse'
+      security:
+      - BearerAuth: []
+      summary: Melihat daftar anggota panitia aktif dan status undangan (Khusus Panitia/Koordinator)
+      tags:
+      - Committees
+  /events/{eventId}/committees/{userId}:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pengguna
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Anggota panitia berhasil dikeluarkan
+          schema:
+            type: string
+        "409":
+          description: Tidak bisa mengeluarkan Koordinator terakhir
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mengeluarkan anggota panitia dari event (Khusus COORDINATOR)
+      tags:
+      - Committees
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Pengguna
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Role baru
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateMemberRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CommitteeMemberResponse'
+        "409":
+          description: Tidak bisa menurunkan Koordinator terakhir
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mengubah role anggota panitia aktif (Khusus COORDINATOR)
+      tags:
+      - Committees
+  /events/{eventId}/committees/me:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil keluar dari kepanitiaan
+          schema:
+            type: string
+        "409":
+          description: Koordinator terakhir tidak dapat keluar sebelum menunjuk pengganti
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Keluar secara mandiri dari kepanitiaan event
+      tags:
+      - Committees
   /events/{eventId}/dashboard:
     get:
       parameters:
@@ -568,6 +732,63 @@ paths:
         & COMMITTEE)
       tags:
       - Operations
+  /events/{eventId}/invitations:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Data undangan
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.InviteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.InvitationResponse'
+        "404":
+          description: Akun dengan email tersebut tidak ditemukan
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mengundang pengguna terdaftar sebagai panitia/koordinator (Khusus COORDINATOR)
+      tags:
+      - Committees
+  /events/{eventId}/invitations/{invitationId}:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: UUID Undangan
+        in: path
+        name: invitationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Undangan berhasil dibatalkan
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Membatalkan undangan yang masih berstatus PENDING (Khusus COORDINATOR)
+      tags:
+      - Committees
   /events/{eventId}/participants:
     get:
       parameters:
@@ -877,6 +1098,76 @@ paths:
       summary: Memperbarui status sesi (COORDINATOR & COMMITTEE)
       tags:
       - Sessions
+  /invitations/{invitationId}/accept:
+    post:
+      parameters:
+      - description: UUID Undangan
+        in: path
+        name: invitationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.InvitationResponse'
+      security:
+      - BearerAuth: []
+      summary: Menerima undangan kepanitiaan
+      tags:
+      - Committees
+  /invitations/{invitationId}/reject:
+    post:
+      parameters:
+      - description: UUID Undangan
+        in: path
+        name: invitationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Undangan ditolak
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Menolak undangan kepanitiaan
+      tags:
+      - Committees
+  /me/invitations:
+    get:
+      parameters:
+      - description: Halaman
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman
+        in: query
+        name: limit
+        type: integer
+      - description: Filter status undangan
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.InvitationResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Melihat daftar undangan kepanitiaan yang masuk untuk pengguna saat
+        ini
+      tags:
+      - Committees
   /me/registrations:
     get:
       parameters:

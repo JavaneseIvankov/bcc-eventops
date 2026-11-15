@@ -256,6 +256,10 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	dashboardService := service.NewDashboardService(eventRepo, registrationRepo, sessionRepo)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 
+	invitationRepo := repository.NewInvitationRepository(db)
+	committeeService := service.NewCommitteeService(invitationRepo, committeeRepo, userRepo)
+	committeeHandler := handler.NewCommitteeHandler(committeeService)
+
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -291,9 +295,21 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 
 	me := api.Group("/me", authMiddleware)
 	me.Get("/registrations", registrationHandler.ListMine)
+	me.Get("/invitations", committeeHandler.ListMyInvitations)
 
 	events.Get("/:eventId/participants", requireCommittee, registrationHandler.ListParticipants)
 	events.Get("/:eventId/dashboard", requireCommittee, dashboardHandler.Get)
+
+	events.Post("/:eventId/invitations", requireCoordinator, committeeHandler.Invite)
+	events.Delete("/:eventId/invitations/:invitationId", requireCoordinator, committeeHandler.CancelInvitation)
+	events.Get("/:eventId/committees", requireCommittee, committeeHandler.GetOverview)
+	events.Delete("/:eventId/committees/me", requireCommittee, committeeHandler.LeaveSelf)
+	events.Patch("/:eventId/committees/:userId", requireCoordinator, committeeHandler.UpdateMemberRole)
+	events.Delete("/:eventId/committees/:userId", requireCoordinator, committeeHandler.RemoveMember)
+
+	invitations := api.Group("/invitations", authMiddleware)
+	invitations.Post("/:invitationId/accept", committeeHandler.Accept)
+	invitations.Post("/:invitationId/reject", committeeHandler.Reject)
 }
 
 func ErrorHandler(c *fiber.Ctx, err error) error {
