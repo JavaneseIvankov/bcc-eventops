@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { LogoImage, LogoSvg } from "./logo"
 import { Separator } from "./ui/separator"
+import { usePathname } from "next/navigation"
 
 const pathify = (slug: string) => `/admin/dashboard/${slug}`
 
@@ -106,6 +107,9 @@ const data: { navMain: NavGroup[] } = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+   const pathname = usePathname()
+   const isActive = (pathname: string, url: string) => url.startsWith(pathname)
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -136,7 +140,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     {item.items.map((item) => (
                       <SidebarMenuSubItem key={item.title}>
                         <SidebarMenuSubButton
-                          isActive={item.isActive}
+                          isActive={isActive(item.url, pathname)}
                           render={<a href={item.url} />}
                         >
                           {item.icon ? <item.icon className="size-4" /> : null}
