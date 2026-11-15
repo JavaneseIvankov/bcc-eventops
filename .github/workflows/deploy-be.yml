@@ -32,8 +32,7 @@ jobs:
           script: |
             cd /home/dev/bcc-eventops
 
-            git fetch origin main
-            git reset --hard origin/main
+            git pull origin main
 
             cd be
 
