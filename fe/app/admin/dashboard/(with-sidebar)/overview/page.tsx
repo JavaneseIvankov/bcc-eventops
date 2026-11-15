@@ -445,7 +445,7 @@ function DashboardHeader({
           </SelectContent>
         </Select>
 
-        <Link href="/events/new" className={buttonVariants()}>
+        <Link href="/admin/dashboard/create-event" className={buttonVariants()}>
           <Plus className="mr-1.5 h-4 w-4" />
           Create event
         </Link>
