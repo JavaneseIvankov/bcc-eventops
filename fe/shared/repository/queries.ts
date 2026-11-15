@@ -88,7 +88,13 @@ import {
 function getErrorMessage(err: unknown, fallback: string): string {
   if (!err || typeof err !== "object") return fallback
 
-  const anyErr = err as Partial<ApiErrorResponse> & Record<string, any>
+  // Runtime error payloads from better-fetch can nest backend response data.
+  // Parse this boundary as unknown-shaped data instead of ApiErrorResponse.
+  const anyErr = err as {
+    message?: unknown
+    cause?: { message?: unknown; error?: { message?: unknown; error?: { message?: unknown } } }
+    error?: { message?: unknown; error?: { message?: unknown } }
+  }
 
   // 1. Cek struktur error bersarang dari backend / @better-fetch
   const nestedMessage =
