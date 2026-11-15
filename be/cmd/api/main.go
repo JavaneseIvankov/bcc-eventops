@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/bcc/eventops-be/docs"
 	"github.com/bcc/eventops-be/internal/bootstrap"
 )
 
@@ -15,7 +16,6 @@ func main() {
 		log.Fatalf("gagal inisialisasi aplikasi: %v", err)
 	}
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -30,3 +30,4 @@ func main() {
 		log.Fatalf("server berhenti: %v", err)
 	}
 }
+

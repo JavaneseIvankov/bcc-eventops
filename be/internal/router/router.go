@@ -8,6 +8,7 @@ import (
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/response"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/swagger"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +16,8 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": cfg.App.Name})
 	})
+
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	api := app.Group("/api/v1")
 	api.Get("/", func(c *fiber.Ctx) error {
