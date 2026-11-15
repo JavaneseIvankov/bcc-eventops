@@ -17,7 +17,12 @@ func runMigrateCLI(cfg *config.DatabaseConfig, dir, action string) error {
 		return fmt.Errorf("folder migration tidak ditemukan: %s", dir)
 	}
 
-	cmd := exec.Command("migrate", "-path", dir, "-database", cfg.MigrationURL(), action)
+	args := []string{"-path", dir, "-database", cfg.MigrationURL(), action}
+	if action == "down" {
+		args = append(args, "-all")
+	}
+
+	cmd := exec.Command("migrate", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin

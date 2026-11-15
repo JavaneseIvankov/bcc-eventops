@@ -1,0 +1,95 @@
+package handler
+
+import (
+	"github.com/bcc/eventops-be/internal/config"
+	"github.com/bcc/eventops-be/internal/dto"
+	apperr "github.com/bcc/eventops-be/internal/errors"
+	"github.com/bcc/eventops-be/internal/middleware"
+	"github.com/bcc/eventops-be/internal/response"
+	"github.com/bcc/eventops-be/internal/service"
+	"github.com/gofiber/fiber/v2"
+)
+
+type AuthHandler struct {
+	authService service.AuthService
+	cfg         *config.Config
+}
+
+func NewAuthHandler(authService service.AuthService, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{authService: authService, cfg: cfg}
+}
+
+func (h *AuthHandler) Register(c *fiber.Ctx) error {
+	var req dto.RegisterRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.ErrInvalidInput
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
+	user, err := h.authService.Register(req)
+	if err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusCreated, "Registrasi berhasil.", dto.NewUserResponse(user))
+}
+
+func (h *AuthHandler) Login(c *fiber.Ctx) error {
+	var req dto.LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.ErrInvalidInput
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
+	user, accessToken, refreshToken, err := h.authService.Login(req)
+	if err != nil {
+		return err
+	}
+
+	setAuthCookies(c, h.cfg, accessToken, refreshToken)
+
+	return response.Success(c, fiber.StatusOK, "Login berhasil.", dto.NewUserResponse(user))
+}
+
+func (h *AuthHandler) Me(c *fiber.Ctx) error {
+	userID, err := middleware.UserIDFromContext(c)
+	if err != nil {
+		return err
+	}
+
+	user, err := h.authService.Me(userID)
+	if err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusOK, "Profil pengguna berhasil diambil.", dto.NewUserResponse(user))
+}
+
+func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
+	refreshToken := c.Cookies("refresh_token")
+
+	accessToken, newRefreshToken, err := h.authService.Refresh(refreshToken)
+	if err != nil {
+		return err
+	}
+
+	setAuthCookies(c, h.cfg, accessToken, newRefreshToken)
+
+	return response.Success(c, fiber.StatusOK, "Token berhasil diperbarui.", nil)
+}
+
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	refreshToken := c.Cookies("refresh_token")
+
+	if err := h.authService.Logout(refreshToken); err != nil {
+		return err
+	}
+
+	clearAuthCookies(c, h.cfg)
+
+	return response.Success(c, fiber.StatusOK, "Logout berhasil.", nil)
+}
