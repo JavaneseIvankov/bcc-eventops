@@ -1,6 +1,6 @@
 "use client"
 
-import { LoginForm } from "@/features/auth/login-form"
+import { LoginForm } from "@/features/auth/components/login-form"
 import { LogoSvg } from "@/shared/components/logo"
 import { Pattern } from "@/shared/components/patterns"
 
