@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/csv"
 	"math"
 	"strconv"
 
@@ -207,4 +209,84 @@ func (h *RegistrationHandler) CheckIn(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, "Check-in berhasil.", dto.NewRegistrationResponse(registration))
+}
+
+// @Summary Check-in peserta dengan memindai QR Token (COORDINATOR & COMMITTEE)
+// @Tags Registrations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Param request body dto.CheckInByQRRequest true "QR token peserta"
+// @Success 200 {object} dto.RegistrationResponse
+// @Failure 404 {string} string "QR token tidak ditemukan"
+// @Failure 409 {string} string "Peserta sudah berstatus CHECKED_IN sebelumnya"
+// @Router /events/{eventId}/check-in/qr [post]
+func (h *RegistrationHandler) CheckInByQR(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	var req dto.CheckInByQRRequest
+	if err := c.BodyParser(&req); err != nil {
+		return apperr.ErrInvalidInput
+	}
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
+	registration, err := h.registrationService.CheckInByQR(eventID, req.QRToken)
+	if err != nil {
+		return err
+	}
+
+	return response.Success(c, fiber.StatusOK, "Check-in via QR berhasil.", dto.NewRegistrationResponse(registration))
+}
+
+// @Summary Ekspor rekap peserta dan kehadiran ke CSV (COORDINATOR & COMMITTEE)
+// @Tags Operations
+// @Produce text/csv
+// @Security BearerAuth
+// @Param eventId path string true "UUID Event"
+// @Param search query string false "Cari berdasarkan nama atau email"
+// @Param status query string false "Filter status pendaftaran"
+// @Success 200 {string} string "File CSV"
+// @Router /events/{eventId}/participants/export [get]
+func (h *RegistrationHandler) ExportParticipants(c *fiber.Ctx) error {
+	eventID, err := uuid.Parse(c.Params("eventId"))
+	if err != nil {
+		return apperr.ErrInvalidInput
+	}
+
+	search := c.Query("search")
+	status := c.Query("status")
+
+	participants, err := h.registrationService.ExportParticipants(eventID, search, status)
+	if err != nil {
+		return err
+	}
+
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+
+	_ = writer.Write([]string{"name", "email", "status", "registered_at", "checked_in_at"})
+	for _, p := range participants {
+		checkedInAt := ""
+		if p.CheckedInAt != nil {
+			checkedInAt = p.CheckedInAt.Format("2006-01-02T15:04:05Z07:00")
+		}
+		_ = writer.Write([]string{
+			p.Name,
+			p.Email,
+			p.Status,
+			p.RegisteredAt.Format("2006-01-02T15:04:05Z07:00"),
+			checkedInAt,
+		})
+	}
+	writer.Flush()
+
+	c.Set(fiber.HeaderContentType, "text/csv")
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="participants.csv"`)
+	return c.Send(buf.Bytes())
 }

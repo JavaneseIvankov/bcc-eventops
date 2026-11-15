@@ -1,8 +1,11 @@
 package dto
 
 import (
+	"net/http"
+	"strings"
 	"time"
 
+	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/google/uuid"
 )
@@ -45,4 +48,16 @@ func NewRegistrationResponseList(regs []models.Registration) []RegistrationRespo
 		list = append(list, NewRegistrationResponse(&regs[i]))
 	}
 	return list
+}
+
+type CheckInByQRRequest struct {
+	QRToken string `json:"qr_token"`
+}
+
+func (r *CheckInByQRRequest) Validate() error {
+	r.QRToken = strings.TrimSpace(r.QRToken)
+	if r.QRToken == "" {
+		return apperr.New(http.StatusBadRequest, "INVALID_INPUT", "qr_token wajib diisi.")
+	}
+	return nil
 }

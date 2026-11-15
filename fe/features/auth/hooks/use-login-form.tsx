@@ -5,6 +5,7 @@ import { useForm, type SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useLogin } from "@/shared/repository/queries"
 import type { LoginInput } from "@/shared/repository/types"
+import { useRouter } from "next/navigation"
 
 export const passwordSchema = z
   .string()
@@ -25,7 +26,11 @@ const loginInputSchema = z.object({
 export type TLoginInputSchema = z.infer<typeof loginInputSchema>
 
 export const useLoginForm = () => {
-  const loginMut = useLogin()
+   const router = useRouter()
+
+   const loginMut = useLogin({
+     onSuccess: () => router.replace("/events"),
+   })
 
   const form = useForm<TLoginInputSchema>({
     resolver: zodResolver(loginInputSchema),

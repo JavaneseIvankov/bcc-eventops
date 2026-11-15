@@ -1,7 +1,13 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	"github.com/bcc/eventops-be/internal/cache"
 	"github.com/bcc/eventops-be/internal/dto"
+	"github.com/bcc/eventops-be/internal/email"
 	"github.com/bcc/eventops-be/internal/models"
 	"github.com/bcc/eventops-be/internal/repository"
 	"github.com/bcc/eventops-be/internal/ws"
@@ -15,16 +21,34 @@ type RegistrationService interface {
 	ListMine(userID uuid.UUID, page, limit int, status string) ([]models.Registration, int64, error)
 	ListParticipants(eventID uuid.UUID, page, limit int, search, status string) ([]dto.ParticipantResponse, int64, error)
 	CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error)
+	CheckInByQR(eventID uuid.UUID, qrToken string) (*models.Registration, error)
+	ExportParticipants(eventID uuid.UUID, search, status string) ([]dto.ParticipantResponse, error)
 }
 
 type registrationService struct {
 	registrationRepo repository.RegistrationRepository
 	eventRepo        repository.EventRepository
+	userRepo         repository.UserRepository
 	hub              *ws.Hub
+	cache            *cache.EventCache
+	emailSender      email.Sender
 }
 
-func NewRegistrationService(registrationRepo repository.RegistrationRepository, eventRepo repository.EventRepository, hub *ws.Hub) RegistrationService {
-	return &registrationService{registrationRepo: registrationRepo, eventRepo: eventRepo, hub: hub}
+func NewRegistrationService(registrationRepo repository.RegistrationRepository, eventRepo repository.EventRepository, userRepo repository.UserRepository, hub *ws.Hub, eventCache *cache.EventCache, emailSender email.Sender) RegistrationService {
+	return &registrationService{
+		registrationRepo: registrationRepo,
+		eventRepo:        eventRepo,
+		userRepo:         userRepo,
+		hub:              hub,
+		cache:            eventCache,
+		emailSender:      emailSender,
+	}
+}
+
+func (s *registrationService) invalidateEventCache(eventID uuid.UUID) {
+	ctx := context.Background()
+	s.cache.InvalidateList(ctx)
+	s.cache.InvalidateDetail(ctx, eventID)
 }
 
 func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Registration, error) {
@@ -33,6 +57,7 @@ func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Regis
 		return nil, err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registration.ID,
@@ -41,7 +66,35 @@ func (s *registrationService) Register(eventID, userID uuid.UUID) (*models.Regis
 	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantRegistered, dto.NewRegistrationResponse(registration)))
 	s.broadcastDashboard(eventID)
 
+	s.sendRegistrationConfirmation(eventID, userID, registration)
+
 	return registration, nil
+}
+
+func (s *registrationService) sendRegistrationConfirmation(eventID, userID uuid.UUID, registration *models.Registration) {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		slog.Warn("gagal mengambil data user untuk email konfirmasi", slog.String("error", err.Error()))
+		return
+	}
+
+	event, err := s.eventRepo.FindByID(eventID)
+	if err != nil {
+		slog.Warn("gagal mengambil data event untuk email konfirmasi", slog.String("error", err.Error()))
+		return
+	}
+
+	subject := fmt.Sprintf("Konfirmasi Pendaftaran: %s", event.Name)
+	body := fmt.Sprintf(
+		"Halo %s,\n\nPendaftaran kamu untuk event \"%s\" berhasil.\n\nLokasi: %s\nWaktu: %s - %s\nKode QR: %s\n\nSampai jumpa di acara!",
+		user.Name, event.Name, event.Location,
+		event.StartTime.Format("02 Jan 2006 15:04"), event.EndTime.Format("02 Jan 2006 15:04"),
+		registration.QRToken,
+	)
+
+	if err := s.emailSender.Send(user.Email, subject, body); err != nil {
+		slog.Warn("gagal mengirim email konfirmasi pendaftaran", slog.String("error", err.Error()))
+	}
 }
 
 func (s *registrationService) CancelSelf(eventID, userID uuid.UUID) error {
@@ -49,6 +102,7 @@ func (s *registrationService) CancelSelf(eventID, userID uuid.UUID) error {
 		return err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"status": models.RegistrationCancelled,
@@ -66,6 +120,7 @@ func (s *registrationService) CancelByID(eventID, registrationID uuid.UUID) erro
 		return err
 	}
 
+	s.invalidateEventCache(eventID)
 	s.broadcastQuota(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registrationID,
@@ -99,20 +154,38 @@ func (s *registrationService) ListParticipants(eventID uuid.UUID, page, limit in
 	return s.registrationRepo.FindParticipants(eventID, page, limit, search, status)
 }
 
+func (s *registrationService) ExportParticipants(eventID uuid.UUID, search, status string) ([]dto.ParticipantResponse, error) {
+	return s.registrationRepo.FindAllParticipants(eventID, search, status)
+}
+
 func (s *registrationService) CheckIn(eventID, registrationID uuid.UUID) (*models.Registration, error) {
 	registration, err := s.registrationRepo.CheckIn(eventID, registrationID)
 	if err != nil {
 		return nil, err
 	}
 
+	s.afterCheckIn(eventID, registration)
+	return registration, nil
+}
+
+func (s *registrationService) CheckInByQR(eventID uuid.UUID, qrToken string) (*models.Registration, error) {
+	registration, err := s.registrationRepo.CheckInByQRToken(eventID, qrToken)
+	if err != nil {
+		return nil, err
+	}
+
+	s.afterCheckIn(eventID, registration)
+	return registration, nil
+}
+
+func (s *registrationService) afterCheckIn(eventID uuid.UUID, registration *models.Registration) {
+	s.invalidateEventCache(eventID)
 	s.hub.Broadcast(eventID, ws.RoomPublic, ws.NewMessage(ws.EventRegistrationUpdated, map[string]any{
 		"registration_id": registration.ID,
 		"status":          registration.Status,
 	}))
 	s.hub.Broadcast(eventID, ws.RoomCommittee, ws.NewMessage(ws.EventParticipantCheckedIn, dto.NewRegistrationResponse(registration)))
 	s.broadcastDashboard(eventID)
-
-	return registration, nil
 }
 
 func (s *registrationService) broadcastQuota(eventID uuid.UUID) {

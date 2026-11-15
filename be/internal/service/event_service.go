@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/bcc/eventops-be/internal/cache"
 	"github.com/bcc/eventops-be/internal/dto"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/models"
@@ -21,10 +23,11 @@ type EventService interface {
 type eventService struct {
 	eventRepo        repository.EventRepository
 	registrationRepo repository.RegistrationRepository
+	cache            *cache.EventCache
 }
 
-func NewEventService(eventRepo repository.EventRepository, registrationRepo repository.RegistrationRepository) EventService {
-	return &eventService{eventRepo: eventRepo, registrationRepo: registrationRepo}
+func NewEventService(eventRepo repository.EventRepository, registrationRepo repository.RegistrationRepository, eventCache *cache.EventCache) EventService {
+	return &eventService{eventRepo: eventRepo, registrationRepo: registrationRepo, cache: eventCache}
 }
 
 func (s *eventService) Create(userID uuid.UUID, req dto.CreateEventRequest) (*models.Event, error) {
@@ -45,6 +48,8 @@ func (s *eventService) Create(userID uuid.UUID, req dto.CreateEventRequest) (*mo
 		return nil, err
 	}
 
+	s.cache.InvalidateList(context.Background())
+
 	return event, nil
 }
 
@@ -56,18 +61,35 @@ func (s *eventService) List(userID uuid.UUID, page, limit int, search, status st
 		limit = 10
 	}
 
-	filter := repository.EventListFilter{
-		Page:        page,
-		Limit:       limit,
-		Search:      search,
-		Status:      status,
-		ManagedByMe: managedByMe,
-		UserID:      userID,
+	ctx := context.Background()
+	cacheUserID := uuid.Nil
+	if managedByMe {
+		cacheUserID = userID
 	}
 
-	events, total, err := s.eventRepo.List(filter)
-	if err != nil {
-		return nil, nil, 0, err
+	var events []models.Event
+	var total int64
+
+	if cached, ok := s.cache.GetList(ctx, page, limit, search, status, managedByMe, cacheUserID); ok {
+		events = cached.Events
+		total = cached.Total
+	} else {
+		filter := repository.EventListFilter{
+			Page:        page,
+			Limit:       limit,
+			Search:      search,
+			Status:      status,
+			ManagedByMe: managedByMe,
+			UserID:      userID,
+		}
+
+		var err error
+		events, total, err = s.eventRepo.List(filter)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+
+		s.cache.SetList(ctx, page, limit, search, status, managedByMe, cacheUserID, cache.EventListResult{Events: events, Total: total})
 	}
 
 	eventIDs := make([]uuid.UUID, len(events))
@@ -84,9 +106,16 @@ func (s *eventService) List(userID uuid.UUID, page, limit int, search, status st
 }
 
 func (s *eventService) Detail(eventID, userID uuid.UUID) (*models.Event, *string, error) {
-	event, err := s.eventRepo.FindByID(eventID)
-	if err != nil {
-		return nil, nil, err
+	ctx := context.Background()
+
+	event, ok := s.cache.GetDetail(ctx, eventID)
+	if !ok {
+		var err error
+		event, err = s.eventRepo.FindByID(eventID)
+		if err != nil {
+			return nil, nil, err
+		}
+		s.cache.SetDetail(ctx, event)
 	}
 
 	roles, err := s.eventRepo.FindMyRoles(userID, []uuid.UUID{eventID})
@@ -150,6 +179,10 @@ func (s *eventService) Update(eventID uuid.UUID, req dto.UpdateEventRequest) (*m
 		return nil, err
 	}
 
+	ctx := context.Background()
+	s.cache.InvalidateList(ctx)
+	s.cache.InvalidateDetail(ctx, eventID)
+
 	return event, nil
 }
 
@@ -157,5 +190,13 @@ func (s *eventService) Delete(eventID uuid.UUID) error {
 	if _, err := s.eventRepo.FindByID(eventID); err != nil {
 		return err
 	}
-	return s.eventRepo.Delete(eventID)
+	if err := s.eventRepo.Delete(eventID); err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	s.cache.InvalidateList(ctx)
+	s.cache.InvalidateDetail(ctx, eventID)
+
+	return nil
 }

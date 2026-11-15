@@ -14,6 +14,7 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	JWT      JWTConfig
+	SMTP     SMTPConfig
 }
 
 type AppConfig struct {
@@ -50,6 +51,14 @@ type JWTConfig struct {
 	RefreshTTL    time.Duration
 }
 
+type SMTPConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	From     string
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -83,6 +92,13 @@ func Load() (*Config, error) {
 			RefreshSecret: getEnv("JWT_REFRESH_SECRET", "change-me-refresh-secret"),
 			AccessTTL:     getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
 			RefreshTTL:    getEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", ""),
+			Port:     getEnv("SMTP_PORT", "587"),
+			User:     getEnv("SMTP_USER", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", "no-reply@bcc-eventops.local"),
 		},
 	}
 

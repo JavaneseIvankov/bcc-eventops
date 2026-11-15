@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Event struct {
@@ -77,6 +78,24 @@ type Session struct {
 }
 
 func (Session) TableName() string { return "sessions" }
+
+type SessionBookmark struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_session_bookmarks_user_session" json:"user_id"`
+	SessionID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uq_session_bookmarks_user_session" json:"session_id"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null;default:now()" json:"created_at"`
+
+	Session *Session `gorm:"foreignKey:SessionID" json:"-"`
+}
+
+func (SessionBookmark) TableName() string { return "session_bookmarks" }
+
+func (b *SessionBookmark) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == uuid.Nil {
+		b.ID = uuid.New()
+	}
+	return nil
+}
 
 type Registration struct {
 	Base
