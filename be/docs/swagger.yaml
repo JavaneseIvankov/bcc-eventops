@@ -11,6 +11,81 @@ definitions:
       user:
         $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UserResponse'
     type: object
+  github_com_bcc_eventops-be_internal_dto.CreateEventRequest:
+    properties:
+      end_time:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      poster_url:
+        type: string
+      quota_total:
+        type: integer
+      short_description:
+        type: string
+      start_time:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.EventDetailResponse:
+    properties:
+      created_at:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      my_role:
+        type: string
+      name:
+        type: string
+      poster_url:
+        type: string
+      quota_available:
+        type: integer
+      quota_filled:
+        type: integer
+      quota_total:
+        type: integer
+      short_description:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.EventSummaryResponse:
+    properties:
+      end_time:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      my_role:
+        type: string
+      name:
+        type: string
+      poster_url:
+        type: string
+      quota_available:
+        type: integer
+      quota_filled:
+        type: integer
+      quota_total:
+        type: integer
+      short_description:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+    type: object
   github_com_bcc_eventops-be_internal_dto.LoginRequest:
     properties:
       email:
@@ -44,6 +119,25 @@ definitions:
       refresh_token:
         type: string
       token_type:
+        type: string
+    type: object
+  github_com_bcc_eventops-be_internal_dto.UpdateEventRequest:
+    properties:
+      end_time:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      poster_url:
+        type: string
+      quota_total:
+        type: integer
+      short_description:
+        type: string
+      start_time:
+        type: string
+      status:
         type: string
     type: object
   github_com_bcc_eventops-be_internal_dto.UserResponse:
@@ -190,6 +284,151 @@ paths:
       summary: Registrasi akun pengguna baru
       tags:
       - Auth
+  /events:
+    get:
+      parameters:
+      - description: Halaman
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman
+        in: query
+        name: limit
+        type: integer
+      - description: Cari berdasarkan nama event
+        in: query
+        name: search
+        type: string
+      - description: Filter status event
+        in: query
+        name: status
+        type: string
+      - description: Filter event yang dikelola user
+        in: query
+        name: managed_by_me
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.EventSummaryResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Katalog daftar event (Paginated)
+      tags:
+      - Events
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data event
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.CreateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.EventDetailResponse'
+        "400":
+          description: Data yang dikirim tidak valid
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Membuat event baru (Pembuat otomatis menjadi COORDINATOR)
+      tags:
+      - Events
+  /events/{eventId}:
+    delete:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Event berhasil dihapus
+          schema:
+            type: string
+        "403":
+          description: Hanya coordinator yang dapat menghapus event
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Menghapus event beserta seluruh data terkait (Khusus COORDINATOR)
+      tags:
+      - Events
+    get:
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.EventDetailResponse'
+        "404":
+          description: Event tidak ditemukan
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mendapatkan detail informasi event beserta my_role dan kuota
+      tags:
+      - Events
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: UUID Event
+        in: path
+        name: eventId
+        required: true
+        type: string
+      - description: Data event yang diubah
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.UpdateEventRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_bcc_eventops-be_internal_dto.EventDetailResponse'
+        "400":
+          description: Kapasitas baru lebih kecil dari jumlah pendaftar aktif
+          schema:
+            type: string
+        "403":
+          description: Hanya coordinator yang dapat mengubah event
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Mengubah informasi event atau kapasitas (Khusus COORDINATOR)
+      tags:
+      - Events
 schemes:
 - http
 - https
