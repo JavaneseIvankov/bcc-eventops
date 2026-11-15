@@ -9,6 +9,7 @@ import (
 	"github.com/bcc/eventops-be/docs"
 	"github.com/bcc/eventops-be/internal/cache"
 	"github.com/bcc/eventops-be/internal/config"
+	"github.com/bcc/eventops-be/internal/email"
 	apperr "github.com/bcc/eventops-be/internal/errors"
 	"github.com/bcc/eventops-be/internal/handler"
 	"github.com/bcc/eventops-be/internal/metrics"
@@ -262,7 +263,8 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	eventService := service.NewEventService(eventRepo, registrationRepo, eventCache)
 	eventHandler := handler.NewEventHandler(eventService)
 
-	registrationService := service.NewRegistrationService(registrationRepo, eventRepo, realtimeHub, eventCache)
+	emailSender := email.NewSender(cfg.SMTP)
+	registrationService := service.NewRegistrationService(registrationRepo, eventRepo, userRepo, realtimeHub, eventCache, emailSender)
 	registrationHandler := handler.NewRegistrationHandler(registrationService)
 
 	sessionRepo := repository.NewSessionRepository(db)
@@ -271,6 +273,10 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 
 	sessionService := service.NewSessionService(sessionRepo, eventRepo, committeeRepo, realtimeHub)
 	sessionHandler := handler.NewSessionHandler(sessionService)
+
+	bookmarkRepo := repository.NewBookmarkRepository(db)
+	bookmarkService := service.NewBookmarkService(bookmarkRepo, sessionRepo)
+	bookmarkHandler := handler.NewBookmarkHandler(bookmarkService)
 
 	invitationRepo := repository.NewInvitationRepository(db)
 	committeeService := service.NewCommitteeService(invitationRepo, committeeRepo, userRepo, realtimeHub)
@@ -289,6 +295,9 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	})
 
 	authMiddleware := middleware.RequireAuth(cfg)
+
+	uploadHandler := handler.NewUploadHandler()
+	api.Post("/uploads", authMiddleware, uploadHandler.Upload)
 
 	auth := api.Group("/auth")
 	auth.Post("/register", authHandler.Register)
@@ -312,6 +321,7 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	registrations.Post("/me/cancel", registrationHandler.CancelSelf)
 	registrations.Post("/:registrationId/cancel", requireCoordinator, registrationHandler.CancelByID)
 	registrations.Post("/:registrationId/check-in", requireCommittee, registrationHandler.CheckIn)
+	events.Post("/:eventId/check-in/qr", requireCommittee, registrationHandler.CheckInByQR)
 
 	sessions := events.Group("/:eventId/sessions")
 	sessions.Get("/", sessionHandler.List)
@@ -319,12 +329,16 @@ func Register(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	sessions.Patch("/:sessionId", requireCoordinator, sessionHandler.Update)
 	sessions.Delete("/:sessionId", requireCoordinator, sessionHandler.Delete)
 	sessions.Patch("/:sessionId/status", requireCommittee, sessionHandler.UpdateStatus)
+	sessions.Post("/:sessionId/bookmark", bookmarkHandler.Add)
+	sessions.Delete("/:sessionId/bookmark", bookmarkHandler.Remove)
 
 	me := api.Group("/me", authMiddleware)
 	me.Get("/registrations", registrationHandler.ListMine)
 	me.Get("/invitations", committeeHandler.ListMyInvitations)
+	me.Get("/bookmarks", bookmarkHandler.ListMine)
 
 	events.Get("/:eventId/participants", requireCommittee, registrationHandler.ListParticipants)
+	events.Get("/:eventId/participants/export", requireCommittee, registrationHandler.ExportParticipants)
 	events.Get("/:eventId/dashboard", requireCommittee, dashboardHandler.Get)
 
 	events.Post("/:eventId/invitations", requireCoordinator, committeeHandler.Invite)
