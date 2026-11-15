@@ -30,6 +30,7 @@
 1. **Prioritaskan `shadcn/ui` Primitives:**
    Gunakan komponen dari `@/shared/components/ui/*` (`Card`, `Badge`, `Button`, `buttonVariants`, `Input`, `Progress`, `Select`, `Table`, `Tabs`, `DropdownMenu`, `AlertDialog`, `Dialog`, `Skeleton`). Jangan membuat komponen dasar dari nol jika sudah ada di `shadcn/ui`.
 2. **DILARANG Menggunakan Prop `asChild` pada `Button` atau `DropdownMenuTrigger`:**
+   > **Catatan penting:** UI kit di proyek ini memakai `@base-ui/react`, **bukan Radix**. `asChild` memang tidak tersedia di sini; primitive Base UI memakai prop `render`. Untuk trigger yang butuh styling tombol, pakai `className={cn(buttonVariants(...))}` langsung pada `XTrigger` (sudah mendukung `className`), bukan `asChild`.
    - **Jangan tulis:** `<Button asChild><Link href="/events">...</Link></Button>`
    - **Gunakan `buttonVariants` langsung pada `<Link>` atau Trigger:**
      ```tsx
@@ -49,7 +50,17 @@
 4. **Data Fetching & Mutasi Wajib Lewat `@/shared/repository/queries`:**
    - Jangan pernah memanggil `fetch()` manual di dalam komponen UI.
    - Selalu gunakan custom hooks TanStack Query dari `@/shared/repository/queries` dan tipe data dari `@/shared/repository/types`.
-5. **Visualisasi Status & Warna Konsisten:**
+5. **Boundary Typing untuk Nilai Enum (WAJIB):**
+   Nilai dari `Select`/trigger pihak ketiga bisa berupa `null`. **Jangan** pakai `as` cast di situ. Narrow dulu di boundary, lalu masuk ke state:
+   ```tsx
+   const handleStatusChange = (value: EventStatus | "ALL" | null) => {
+     if (!value) return
+     setStatusFilter(value)
+   }
+   ```
+   Untuk daftar status/tab, definisikan sekali sebagai `as const` lalu turunkan tipenya, supaya tidak ada union yang melebar jadi `string`.
+
+6. **Visualisasi Status & Warna Konsisten:**
    - `ONGOING`: Badge `variant="default"` dengan dot hijau berkedip (`bg-emerald-500 animate-pulse`).
    - `UPCOMING`: Badge `variant="secondary"` dengan dot biru (`bg-blue-500`).
    - `FINISHED`: Badge `variant="outline"` dengan dot abu-abu (`bg-muted-foreground`).

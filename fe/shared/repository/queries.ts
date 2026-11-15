@@ -7,6 +7,7 @@ import {
   type UseQueryOptions,
   type UseMutationOptions,
 } from "@tanstack/react-query"
+import { toast } from "sonner"
 import type {
   ApiResponse,
   PaginatedApiResponse,
@@ -81,6 +82,46 @@ import {
 } from "./actions"
 
 // ============================================================================
+// TOAST MESSAGE HELPERS
+// ============================================================================
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (!err || typeof err !== "object") return fallback
+
+  const anyErr = err as Partial<ApiErrorResponse> & Record<string, any>
+
+  // 1. Cek struktur error bersarang dari backend / @better-fetch
+  const nestedMessage =
+    anyErr?.error?.error?.message ||
+    anyErr?.cause?.error?.message ||
+    anyErr?.error?.message ||
+    anyErr?.cause?.message
+
+  if (typeof nestedMessage === "string" && nestedMessage.trim().length > 0) {
+    return nestedMessage
+  }
+
+  // 2. Cek err.message standar (abaikan jika hanya kode angka HTTP seperti "409" atau pesan digest Next.js)
+  if (
+    typeof anyErr.message === "string" &&
+    anyErr.message.trim().length > 0 &&
+    !/^\d{3}$/.test(anyErr.message.trim()) &&
+    !anyErr.message.includes("Server Components render")
+  ) {
+    return anyErr.message
+  }
+
+  return fallback
+}
+
+function getSuccessMessage(
+  res: { message?: string } | undefined,
+  fallback: string
+): string {
+  return res?.message || fallback
+}
+
+// ============================================================================
 // QUERY KEYS FACTORY
 // ============================================================================
 
@@ -144,13 +185,20 @@ export function useRegister(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (body) => registerAction(body),
     onSuccess: async (res, variables, onMutateResult, context) => {
       queryClient.setQueryData(eventOpsKeys.auth.me(), res)
+      toast.success(
+        getSuccessMessage(res, "Registrasi berhasil! Selamat datang di BCCin.")
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal melakukan registrasi akun."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -160,13 +208,18 @@ export function useLogin(
   options?: UseMutationOptions<ApiResponse<User>, ApiErrorResponse, LoginInput>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (body) => loginAction(body),
     onSuccess: async (res, variables, onMutateResult, context) => {
       queryClient.setQueryData(eventOpsKeys.auth.me(), res)
+      toast.success(getSuccessMessage(res, "Berhasil masuk ke akun!"))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Email atau password tidak valid."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -185,13 +238,18 @@ export function useLogout(
   options?: UseMutationOptions<ApiResponse<null>, ApiErrorResponse, void>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: () => logoutAction(),
     onSuccess: async (res, variables, onMutateResult, context) => {
       queryClient.clear()
+      toast.success(getSuccessMessage(res, "Berhasil keluar dari akun."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal keluar dari akun."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -208,19 +266,29 @@ export function useUploadFile(
     File | FormData
   >
 ) {
+  const { onSuccess, onError, ...restOptions } = options ?? {}
+
   return useMutation({
     mutationFn: (input) => {
       const formData =
         input instanceof FormData
           ? input
           : (() => {
-              const fd = new FormData()
-              fd.append("file", input)
-              return fd
-            })()
+            const fd = new FormData()
+            fd.append("file", input)
+            return fd
+          })()
       return uploadFileAction(formData)
     },
-    ...options,
+    onSuccess: async (res, variables, onMutateResult, context) => {
+      toast.success(getSuccessMessage(res, "Poster berhasil diunggah."))
+      await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal mengunggah file poster."))
+      await onError?.(err, variables, onMutateResult, context)
+    },
+    ...restOptions,
   })
 }
 
@@ -265,7 +333,7 @@ export function useCreateEvent(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (body) => createEventAction(body),
@@ -273,7 +341,17 @@ export function useCreateEvent(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.lists(),
       })
+      toast.success(
+        getSuccessMessage(
+          res,
+          "Event baru berhasil dibuat! Anda adalah Koordinator."
+        )
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal membuat event baru."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -287,7 +365,7 @@ export function useUpdateEvent(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => updateEventAction(vars),
@@ -303,7 +381,14 @@ export function useUpdateEvent(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Informasi event berhasil diperbarui.")
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal memperbarui informasi event."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -313,7 +398,7 @@ export function useDeleteEvent(
   options?: UseMutationOptions<ApiResponse<null>, ApiErrorResponse, string>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (eventId) => deleteEventAction(eventId),
@@ -324,7 +409,12 @@ export function useDeleteEvent(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.lists(),
       })
+      toast.success(getSuccessMessage(res, "Event berhasil dihapus."))
       await onSuccess?.(res, eventId, onMutateResult, context)
+    },
+    onError: async (err, eventId, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menghapus event."))
+      await onError?.(err, eventId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -371,7 +461,7 @@ export function useInviteCommittee(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => inviteCommitteeAction(vars),
@@ -379,7 +469,17 @@ export function useInviteCommittee(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.committees(variables.eventId),
       })
+      toast.success(
+        getSuccessMessage(
+          res,
+          `Undangan panitia dikirim ke ${variables.body.email}.`
+        )
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal mengirim undangan kepanitiaan."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -389,7 +489,7 @@ export function useAcceptInvitation(
   options?: UseMutationOptions<ApiResponse<null>, ApiErrorResponse, string>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (invitationId) => acceptInvitationAction(invitationId),
@@ -398,7 +498,17 @@ export function useAcceptInvitation(
         queryClient.invalidateQueries({ queryKey: eventOpsKeys.me.all() }),
         queryClient.invalidateQueries({ queryKey: eventOpsKeys.events.all() }),
       ])
+      toast.success(
+        getSuccessMessage(
+          res,
+          "Undangan diterima! Anda kini menjadi panitia aktif."
+        )
+      )
       await onSuccess?.(res, invitationId, onMutateResult, context)
+    },
+    onError: async (err, invitationId, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menerima undangan kepanitiaan."))
+      await onError?.(err, invitationId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -408,13 +518,20 @@ export function useRejectInvitation(
   options?: UseMutationOptions<ApiResponse<null>, ApiErrorResponse, string>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (invitationId) => rejectInvitationAction(invitationId),
     onSuccess: async (res, invitationId, onMutateResult, context) => {
       await queryClient.invalidateQueries({ queryKey: eventOpsKeys.me.all() })
+      toast.success(
+        getSuccessMessage(res, "Undangan kepanitiaan telah ditolak.")
+      )
       await onSuccess?.(res, invitationId, onMutateResult, context)
+    },
+    onError: async (err, invitationId, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menolak undangan kepanitiaan."))
+      await onError?.(err, invitationId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -428,7 +545,7 @@ export function useCancelInvitation(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => cancelInvitationAction(vars),
@@ -436,7 +553,12 @@ export function useCancelInvitation(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.committees(variables.eventId),
       })
+      toast.success(getSuccessMessage(res, "Undangan berhasil dibatalkan."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal membatalkan undangan."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -450,7 +572,7 @@ export function useUpdateCommitteeRole(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => updateCommitteeRoleAction(vars),
@@ -463,7 +585,14 @@ export function useUpdateCommitteeRole(
           queryKey: eventOpsKeys.events.detail(variables.eventId),
         }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Role anggota panitia berhasil diubah.")
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal mengubah role anggota panitia."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -477,7 +606,7 @@ export function useRemoveCommitteeMember(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => removeCommitteeMemberAction(vars),
@@ -485,7 +614,17 @@ export function useRemoveCommitteeMember(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.committees(variables.eventId),
       })
+      toast.success(
+        getSuccessMessage(
+          res,
+          "Anggota panitia berhasil dikeluarkan dari event."
+        )
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal mengeluarkan anggota panitia."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -495,7 +634,7 @@ export function useLeaveCommittee(
   options?: UseMutationOptions<ApiResponse<null>, ApiErrorResponse, string>
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (eventId) => leaveCommitteeAction(eventId),
@@ -508,7 +647,14 @@ export function useLeaveCommittee(
           queryKey: eventOpsKeys.events.lists(),
         }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Anda telah keluar dari kepanitiaan event ini.")
+      )
       await onSuccess?.(res, eventId, onMutateResult, context)
+    },
+    onError: async (err, eventId, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal keluar dari kepanitiaan."))
+      await onError?.(err, eventId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -541,7 +687,7 @@ export function useCreateSession(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => createSessionAction(vars),
@@ -554,7 +700,12 @@ export function useCreateSession(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(getSuccessMessage(res, "Sesi baru berhasil ditambahkan."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menambahkan sesi ke rundown."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -568,7 +719,7 @@ export function useUpdateSession(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => updateSessionAction(vars),
@@ -576,7 +727,12 @@ export function useUpdateSession(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.sessions(variables.eventId),
       })
+      toast.success(getSuccessMessage(res, "Detail sesi berhasil diperbarui."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal memperbarui detail sesi."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -590,7 +746,7 @@ export function useDeleteSession(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => deleteSessionAction(vars),
@@ -603,7 +759,14 @@ export function useDeleteSession(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Sesi berhasil dihapus dari rundown.")
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menghapus sesi."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -617,7 +780,7 @@ export function useUpdateSessionStatus(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => updateSessionStatusAction(vars),
@@ -630,7 +793,17 @@ export function useUpdateSessionStatus(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(
+        getSuccessMessage(
+          res,
+          `Status sesi diperbarui menjadi ${variables.body.status}.`
+        )
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal memperbarui status sesi."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -662,7 +835,7 @@ export function useRegisterEvent(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (eventId) => registerEventAction(eventId),
@@ -676,7 +849,29 @@ export function useRegisterEvent(
         }),
         queryClient.invalidateQueries({ queryKey: eventOpsKeys.me.all() }),
       ])
+      toast.success(
+        getSuccessMessage(
+          res,
+          "Berhasil mendaftar! Tiket QR Anda sudah tersedia."
+        )
+      )
       await onSuccess?.(res, eventId, onMutateResult, context)
+    },
+    onError: async (err, eventId, onMutateResult, context) => {
+      // Sinkronkan ulang status pendaftaran jika user sudah terdaftar (409 ALREADY_REGISTERED)
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: eventOpsKeys.events.detail(eventId),
+        }),
+        queryClient.invalidateQueries({ queryKey: eventOpsKeys.me.all() }),
+      ])
+      toast.error(
+        getErrorMessage(
+          err,
+          "Anda sudah terdaftar aktif atau kuota pada event ini sudah penuh."
+        )
+      )
+      await onError?.(err, eventId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -690,7 +885,7 @@ export function useCancelMyRegistration(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (eventId) => cancelMyRegistrationAction(eventId),
@@ -704,7 +899,14 @@ export function useCancelMyRegistration(
         }),
         queryClient.invalidateQueries({ queryKey: eventOpsKeys.me.all() }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Pendaftaran Anda berhasil dibatalkan.")
+      )
       await onSuccess?.(res, eventId, onMutateResult, context)
+    },
+    onError: async (err, eventId, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal membatalkan pendaftaran."))
+      await onError?.(err, eventId, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -718,7 +920,7 @@ export function useCancelParticipantRegistration(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => cancelParticipantRegistrationAction(vars),
@@ -731,7 +933,16 @@ export function useCancelParticipantRegistration(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(
+        getSuccessMessage(res, "Pendaftaran peserta berhasil dibatalkan.")
+      )
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(
+        getErrorMessage(err, "Gagal membatalkan pendaftaran peserta.")
+      )
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -745,7 +956,7 @@ export function useCheckInManual(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => checkInManualAction(vars),
@@ -758,7 +969,12 @@ export function useCheckInManual(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(getSuccessMessage(res, "Check-in peserta berhasil!"))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal melakukan check-in peserta."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -772,7 +988,7 @@ export function useCheckInQr(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => checkInQrAction(vars),
@@ -785,7 +1001,12 @@ export function useCheckInQr(
           queryKey: eventOpsKeys.events.dashboard(variables.eventId),
         }),
       ])
+      toast.success(getSuccessMessage(res, "Check-in via QR berhasil!"))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal memverifikasi QR Code peserta."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -818,7 +1039,7 @@ export function useCreateAnnouncement(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => createAnnouncementAction(vars),
@@ -826,7 +1047,12 @@ export function useCreateAnnouncement(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.announcements(variables.eventId),
       })
+      toast.success(getSuccessMessage(res, "Pengumuman berhasil diterbitkan."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menerbitkan pengumuman."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -840,7 +1066,7 @@ export function useUpdateAnnouncement(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => updateAnnouncementAction(vars),
@@ -848,7 +1074,12 @@ export function useUpdateAnnouncement(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.announcements(variables.eventId),
       })
+      toast.success(getSuccessMessage(res, "Pengumuman berhasil diperbarui."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal memperbarui pengumuman."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })
@@ -862,7 +1093,7 @@ export function useDeleteAnnouncement(
   >
 ) {
   const queryClient = useQueryClient()
-  const { onSuccess, ...restOptions } = options ?? {}
+  const { onSuccess, onError, ...restOptions } = options ?? {}
 
   return useMutation({
     mutationFn: (vars) => deleteAnnouncementAction(vars),
@@ -870,7 +1101,12 @@ export function useDeleteAnnouncement(
       await queryClient.invalidateQueries({
         queryKey: eventOpsKeys.events.announcements(variables.eventId),
       })
+      toast.success(getSuccessMessage(res, "Pengumuman berhasil dihapus."))
       await onSuccess?.(res, variables, onMutateResult, context)
+    },
+    onError: async (err, variables, onMutateResult, context) => {
+      toast.error(getErrorMessage(err, "Gagal menghapus pengumuman."))
+      await onError?.(err, variables, onMutateResult, context)
     },
     ...restOptions,
   })

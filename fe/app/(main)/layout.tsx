@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client"
 
 import * as React from "react"
@@ -33,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu"
 import { Skeleton } from "@/shared/components/ui/skeleton"
+import { LogoImage } from "@/shared/components/logo"
 
 export default function MainLayout({
   children,
@@ -118,9 +120,7 @@ export default function MainLayout({
               href="/dashboard"
               className="flex items-center gap-2 font-bold tracking-tight text-foreground"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Calendar className="h-4 w-4" />
-              </div>
+              <LogoImage className="h-8 w-8"></LogoImage>
               <span className="text-lg">BCCin</span>
             </Link>
 
@@ -199,16 +199,18 @@ export default function MainLayout({
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="truncate text-sm leading-none font-medium">
-                      {user.name}
-                    </p>
-                    <p className="truncate text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="truncate text-sm leading-none font-medium">
+                        {user.name}
+                      </p>
+                      <p className="truncate text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
 
                 <DropdownMenuSeparator />
 
@@ -234,8 +236,8 @@ export default function MainLayout({
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
+                  variant="destructive"
                   disabled={logoutMutation.isPending}
-                  className="text-destructive focus:text-destructive"
                   onClick={() => logoutMutation.mutate()}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
@@ -255,4 +257,11 @@ export default function MainLayout({
       </main>
     </div>
   )
+=======
+import * as React from "react"
+import { MainShellContainer } from "@/features/main-shell/containers/main-shell-container"
+
+export default function MainLayout({ children }: { children: React.ReactNode }) {
+  return <MainShellContainer>{children}</MainShellContainer>
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 }

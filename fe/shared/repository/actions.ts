@@ -48,6 +48,14 @@ interface LoginResponseData extends AuthTokenData {
   user: User
 }
 
+<<<<<<< HEAD
+const API_BASE_URL =
+  process.env.INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080/api/v1"
+
+=======
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 async function setAuthCookies(accessToken: string, refreshToken?: string) {
   const cookieStore = await cookies()
 
@@ -70,15 +78,71 @@ async function setAuthCookies(accessToken: string, refreshToken?: string) {
   }
 }
 
+<<<<<<< HEAD
+export async function getAccessTokenAction(): Promise<string | null> {
+  const cookieStore = await cookies()
+  return cookieStore.get("access_token")?.value ?? null
+}
+
+// ============================================================================
+// ERROR EXTRACTOR & QUERY CLEANER
+// ============================================================================
+
+function cleanQuery<T extends Record<string, any> | undefined>(
+  params: T
+): Record<string, any> | undefined {
+  if (!params) return undefined
+  const cleaned: Record<string, any> = {}
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "" && value !== "ALL") {
+      cleaned[key] = value
+    }
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined
+}
+
+function extractBackendErrorMessage(err: any): string {
+  // Struktur error dari Go Fiber: { success: false, error: { code: "...", message: "..." } }
+  const nestedMessage =
+    err?.error?.error?.message ||
+    err?.cause?.error?.message ||
+    err?.error?.message ||
+    err?.cause?.message
+
+  if (typeof nestedMessage === "string" && nestedMessage.trim().length > 0) {
+    return nestedMessage
+  }
+
+  // Abaikan jika err.message hanya berisi kode angka status HTTP (misal "409", "400")
+  if (
+    typeof err?.message === "string" &&
+    err.message.trim().length > 0 &&
+    !/^\d{3}$/.test(err.message.trim())
+  ) {
+    return err.message
+  }
+
+  const status = err?.status || err?.response?.status
+  if (status === 401) return "Sesi Anda telah berakhir atau kredensial salah."
+  if (status === 403)
+    return "Anda tidak memiliki akses operasional untuk tindakan ini."
+  if (status === 404) return "Data yang diminta tidak ditemukan."
+  if (status === 409)
+    return "Data sudah ada atau tidak dapat diproses karena konflik status."
+
+  return "Terjadi kesalahan pada server."
+}
+
+// ============================================================================
+// BETTER-FETCH INSTANCE & WRAPPER (DENGAN AUTO-REFRESH & ERROR FORMATTING)
+=======
 // ============================================================================
 // BETTER-FETCH INSTANCE (SERVER-SIDE DENGAN BEARER TOKEN)
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 // ============================================================================
 
 const $fetch = createFetch({
-  baseURL:
-    process.env.INTERNAL_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8080/api/v1",
+  baseURL: API_BASE_URL,
   throw: true,
   onRequest: async (context) => {
     const cookieStore = await cookies()
@@ -91,20 +155,73 @@ const $fetch = createFetch({
     return context
   },
 })
+<<<<<<< HEAD
+
+async function apiFetch<T>(
+  endpoint: string,
+  options: Record<string, any> = {},
+  isRetry = false
+): Promise<T> {
+  try {
+    return await $fetch<T>(endpoint, options)
+  } catch (err: any) {
+    // Auto-refresh token jika 401 Unauthorized dan bukan di endpoint auth
+    if (
+      err?.status === 401 &&
+      !isRetry &&
+      endpoint !== "/auth/login" &&
+      endpoint !== "/auth/register" &&
+      endpoint !== "/auth/refresh"
+    ) {
+      const cookieStore = await cookies()
+      const refreshToken = cookieStore.get("refresh_token")?.value
+
+      if (refreshToken) {
+        try {
+          const refreshRes = await $fetch<ApiResponse<AuthTokenData>>(
+            "/auth/refresh",
+            {
+              method: "POST",
+              body: { refresh_token: refreshToken },
+            }
+          )
+          await setAuthCookies(
+            refreshRes.data.access_token,
+            refreshRes.data.refresh_token
+          )
+          return await apiFetch<T>(endpoint, options, true)
+        } catch {
+          cookieStore.delete("access_token")
+          cookieStore.delete("refresh_token")
+        }
+      }
+    }
+
+    // Lempar standar Error dengan pesan asli backend agar terbaca di client Toast
+    const message = extractBackendErrorMessage(err)
+    throw new Error(message)
+  }
+}
+=======
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
 
 // ============================================================================
 // M1: AUTH ACTIONS
 // ============================================================================
 
 export async function registerAction(body: RegisterInput) {
-  return $fetch<ApiResponse<User>>("/auth/register", {
+  return apiFetch<ApiResponse<User>>("/auth/register", {
     method: "POST",
     body,
   })
 }
 
 export async function loginAction(body: LoginInput) {
+<<<<<<< HEAD
+  const res = await apiFetch<ApiResponse<LoginResponseData>>("/auth/login", {
+=======
   const res = await $fetch<ApiResponse<LoginResponseData>>("/auth/login", {
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
     method: "POST",
     body,
   })
@@ -118,7 +235,11 @@ export async function refreshTokenAction() {
   const cookieStore = await cookies()
   const refreshToken = cookieStore.get("refresh_token")?.value
 
+<<<<<<< HEAD
+  const res = await apiFetch<ApiResponse<AuthTokenData>>("/auth/refresh", {
+=======
   const res = await $fetch<ApiResponse<AuthTokenData>>("/auth/refresh", {
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
     method: "POST",
     body: { refresh_token: refreshToken },
   })
@@ -133,10 +254,19 @@ export async function logoutAction() {
   const refreshToken = cookieStore.get("refresh_token")?.value
 
   try {
+<<<<<<< HEAD
+    await apiFetch<ApiResponse<null>>("/auth/logout", {
+      method: "POST",
+      body: { refresh_token: refreshToken },
+    })
+  } catch {
+    // Abaikan error dari server saat logout
+=======
     await $fetch<ApiResponse<null>>("/auth/logout", {
       method: "POST",
       body: { refresh_token: refreshToken },
     })
+>>>>>>> 4d4a4a376b2222d60879d33b310cc207d2a81a58
   } finally {
     cookieStore.delete("access_token")
     cookieStore.delete("refresh_token")
@@ -150,7 +280,7 @@ export async function logoutAction() {
 }
 
 export async function getMeAction() {
-  return $fetch<ApiResponse<User>>("/auth/me", {
+  return apiFetch<ApiResponse<User>>("/auth/me", {
     method: "GET",
   })
 }
@@ -160,7 +290,7 @@ export async function getMeAction() {
 // ============================================================================
 
 export async function uploadFileAction(formData: FormData) {
-  return $fetch<ApiResponse<UploadResponseData>>("/uploads", {
+  return apiFetch<ApiResponse<UploadResponseData>>("/uploads", {
     method: "POST",
     body: formData,
   })
@@ -171,21 +301,21 @@ export async function uploadFileAction(formData: FormData) {
 // ============================================================================
 
 export async function getEventsAction(params?: GetEventsParams) {
-  return $fetch<PaginatedApiResponse<EventSummary>>("/events", {
+  return apiFetch<PaginatedApiResponse<EventSummary>>("/events", {
     method: "GET",
-    query: params,
+    query: cleanQuery(params),
   })
 }
 
 export async function createEventAction(body: CreateEventInput) {
-  return $fetch<ApiResponse<EventDetail>>("/events", {
+  return apiFetch<ApiResponse<EventDetail>>("/events", {
     method: "POST",
     body,
   })
 }
 
 export async function getEventDetailAction(eventId: string) {
-  return $fetch<ApiResponse<EventDetail>>(`/events/${eventId}`, {
+  return apiFetch<ApiResponse<EventDetail>>(`/events/${eventId}`, {
     method: "GET",
   })
 }
@@ -197,14 +327,14 @@ export async function updateEventAction({
   eventId: string
   body: UpdateEventInput
 }) {
-  return $fetch<ApiResponse<EventDetail>>(`/events/${eventId}`, {
+  return apiFetch<ApiResponse<EventDetail>>(`/events/${eventId}`, {
     method: "PATCH",
     body,
   })
 }
 
 export async function deleteEventAction(eventId: string) {
-  return $fetch<ApiResponse<null>>(`/events/${eventId}`, {
+  return apiFetch<ApiResponse<null>>(`/events/${eventId}`, {
     method: "DELETE",
   })
 }
@@ -220,28 +350,30 @@ export async function inviteCommitteeAction({
   eventId: string
   body: InviteCommitteeInput
 }) {
-  return $fetch<ApiResponse<Invitation>>(`/events/${eventId}/invitations`, {
+  return apiFetch<ApiResponse<Invitation>>(`/events/${eventId}/invitations`, {
     method: "POST",
     body,
   })
 }
 
 export async function getMyInvitationsAction(params?: GetMyInvitationsParams) {
-  return $fetch<PaginatedApiResponse<Invitation>>("/me/invitations", {
+  return apiFetch<PaginatedApiResponse<Invitation>>("/me/invitations", {
     method: "GET",
-    query: params,
+    query: cleanQuery(params),
   })
 }
 
 export async function acceptInvitationAction(invitationId: string) {
-  return $fetch<ApiResponse<null>>(`/invitations/${invitationId}/accept`, {
+  return apiFetch<ApiResponse<null>>(`/invitations/${invitationId}/accept`, {
     method: "POST",
+    body: {},
   })
 }
 
 export async function rejectInvitationAction(invitationId: string) {
-  return $fetch<ApiResponse<null>>(`/invitations/${invitationId}/reject`, {
+  return apiFetch<ApiResponse<null>>(`/invitations/${invitationId}/reject`, {
     method: "POST",
+    body: {},
   })
 }
 
@@ -252,7 +384,7 @@ export async function cancelInvitationAction({
   eventId: string
   invitationId: string
 }) {
-  return $fetch<ApiResponse<null>>(
+  return apiFetch<ApiResponse<null>>(
     `/events/${eventId}/invitations/${invitationId}`,
     {
       method: "DELETE",
@@ -261,7 +393,7 @@ export async function cancelInvitationAction({
 }
 
 export async function getEventCommitteesAction(eventId: string) {
-  return $fetch<ApiResponse<EventCommitteesData>>(
+  return apiFetch<ApiResponse<EventCommitteesData>>(
     `/events/${eventId}/committees`,
     {
       method: "GET",
@@ -278,10 +410,13 @@ export async function updateCommitteeRoleAction({
   userId: string
   body: UpdateCommitteeRoleInput
 }) {
-  return $fetch<ApiResponse<null>>(`/events/${eventId}/committees/${userId}`, {
-    method: "PATCH",
-    body,
-  })
+  return apiFetch<ApiResponse<null>>(
+    `/events/${eventId}/committees/${userId}`,
+    {
+      method: "PATCH",
+      body,
+    }
+  )
 }
 
 export async function removeCommitteeMemberAction({
@@ -291,13 +426,16 @@ export async function removeCommitteeMemberAction({
   eventId: string
   userId: string
 }) {
-  return $fetch<ApiResponse<null>>(`/events/${eventId}/committees/${userId}`, {
-    method: "DELETE",
-  })
+  return apiFetch<ApiResponse<null>>(
+    `/events/${eventId}/committees/${userId}`,
+    {
+      method: "DELETE",
+    }
+  )
 }
 
 export async function leaveCommitteeAction(eventId: string) {
-  return $fetch<ApiResponse<null>>(`/events/${eventId}/committees/me`, {
+  return apiFetch<ApiResponse<null>>(`/events/${eventId}/committees/me`, {
     method: "DELETE",
   })
 }
@@ -307,7 +445,7 @@ export async function leaveCommitteeAction(eventId: string) {
 // ============================================================================
 
 export async function getEventSessionsAction(eventId: string) {
-  return $fetch<ApiResponse<Session[]>>(`/events/${eventId}/sessions`, {
+  return apiFetch<ApiResponse<Session[]>>(`/events/${eventId}/sessions`, {
     method: "GET",
   })
 }
@@ -319,7 +457,7 @@ export async function createSessionAction({
   eventId: string
   body: CreateSessionInput
 }) {
-  return $fetch<ApiResponse<Session>>(`/events/${eventId}/sessions`, {
+  return apiFetch<ApiResponse<Session>>(`/events/${eventId}/sessions`, {
     method: "POST",
     body,
   })
@@ -334,7 +472,7 @@ export async function updateSessionAction({
   sessionId: string
   body: UpdateSessionInput
 }) {
-  return $fetch<ApiResponse<Session>>(
+  return apiFetch<ApiResponse<Session>>(
     `/events/${eventId}/sessions/${sessionId}`,
     {
       method: "PATCH",
@@ -350,9 +488,12 @@ export async function deleteSessionAction({
   eventId: string
   sessionId: string
 }) {
-  return $fetch<ApiResponse<null>>(`/events/${eventId}/sessions/${sessionId}`, {
-    method: "DELETE",
-  })
+  return apiFetch<ApiResponse<null>>(
+    `/events/${eventId}/sessions/${sessionId}`,
+    {
+      method: "DELETE",
+    }
+  )
 }
 
 export async function updateSessionStatusAction({
@@ -364,7 +505,7 @@ export async function updateSessionStatusAction({
   sessionId: string
   body: UpdateSessionStatusInput
 }) {
-  return $fetch<ApiResponse<Session>>(
+  return apiFetch<ApiResponse<Session>>(
     `/events/${eventId}/sessions/${sessionId}/status`,
     {
       method: "PATCH",
@@ -378,26 +519,30 @@ export async function updateSessionStatusAction({
 // ============================================================================
 
 export async function registerEventAction(eventId: string) {
-  return $fetch<ApiResponse<Registration>>(`/events/${eventId}/registrations`, {
-    method: "POST",
-    body: {},
-  })
+  return apiFetch<ApiResponse<Registration>>(
+    `/events/${eventId}/registrations`,
+    {
+      method: "POST",
+      body: {},
+    }
+  )
 }
 
 export async function getMyRegistrationsAction(
   params?: GetMyRegistrationsParams
 ) {
-  return $fetch<PaginatedApiResponse<Registration>>("/me/registrations", {
+  return apiFetch<PaginatedApiResponse<Registration>>("/me/registrations", {
     method: "GET",
-    query: params,
+    query: cleanQuery(params),
   })
 }
 
 export async function cancelMyRegistrationAction(eventId: string) {
-  return $fetch<ApiResponse<Registration>>(
+  return apiFetch<ApiResponse<Registration>>(
     `/events/${eventId}/registrations/me/cancel`,
     {
       method: "POST",
+      body: {},
     }
   )
 }
@@ -409,10 +554,11 @@ export async function cancelParticipantRegistrationAction({
   eventId: string
   registrationId: string
 }) {
-  return $fetch<ApiResponse<null>>(
+  return apiFetch<ApiResponse<null>>(
     `/events/${eventId}/registrations/${registrationId}/cancel`,
     {
       method: "POST",
+      body: {},
     }
   )
 }
@@ -424,10 +570,11 @@ export async function checkInManualAction({
   eventId: string
   registrationId: string
 }) {
-  return $fetch<ApiResponse<CheckInResultData>>(
+  return apiFetch<ApiResponse<CheckInResultData>>(
     `/events/${eventId}/registrations/${registrationId}/check-in`,
     {
       method: "POST",
+      body: {},
     }
   )
 }
@@ -439,7 +586,7 @@ export async function checkInQrAction({
   eventId: string
   body: CheckInQrInput
 }) {
-  return $fetch<ApiResponse<CheckInResultData>>(
+  return apiFetch<ApiResponse<CheckInResultData>>(
     `/events/${eventId}/check-in/qr`,
     {
       method: "POST",
@@ -453,7 +600,7 @@ export async function checkInQrAction({
 // ============================================================================
 
 export async function getAnnouncementsAction(eventId: string) {
-  return $fetch<ApiResponse<Announcement[]>>(
+  return apiFetch<ApiResponse<Announcement[]>>(
     `/events/${eventId}/announcements`,
     {
       method: "GET",
@@ -468,10 +615,13 @@ export async function createAnnouncementAction({
   eventId: string
   body: CreateAnnouncementInput
 }) {
-  return $fetch<ApiResponse<Announcement>>(`/events/${eventId}/announcements`, {
-    method: "POST",
-    body,
-  })
+  return apiFetch<ApiResponse<Announcement>>(
+    `/events/${eventId}/announcements`,
+    {
+      method: "POST",
+      body,
+    }
+  )
 }
 
 export async function updateAnnouncementAction({
@@ -483,7 +633,7 @@ export async function updateAnnouncementAction({
   announcementId: string
   body: UpdateAnnouncementInput
 }) {
-  return $fetch<ApiResponse<Announcement>>(
+  return apiFetch<ApiResponse<Announcement>>(
     `/events/${eventId}/announcements/${announcementId}`,
     {
       method: "PATCH",
@@ -499,7 +649,7 @@ export async function deleteAnnouncementAction({
   eventId: string
   announcementId: string
 }) {
-  return $fetch<ApiResponse<null>>(
+  return apiFetch<ApiResponse<null>>(
     `/events/${eventId}/announcements/${announcementId}`,
     {
       method: "DELETE",
@@ -508,9 +658,12 @@ export async function deleteAnnouncementAction({
 }
 
 export async function getEventDashboardAction(eventId: string) {
-  return $fetch<ApiResponse<DashboardSummary>>(`/events/${eventId}/dashboard`, {
-    method: "GET",
-  })
+  return apiFetch<ApiResponse<DashboardSummary>>(
+    `/events/${eventId}/dashboard`,
+    {
+      method: "GET",
+    }
+  )
 }
 
 export async function getEventParticipantsAction({
@@ -520,11 +673,11 @@ export async function getEventParticipantsAction({
   eventId: string
   params?: GetEventParticipantsParams
 }) {
-  return $fetch<PaginatedApiResponse<ParticipantItem>>(
+  return apiFetch<PaginatedApiResponse<ParticipantItem>>(
     `/events/${eventId}/participants`,
     {
       method: "GET",
-      query: params,
+      query: cleanQuery(params),
     }
   )
 }
