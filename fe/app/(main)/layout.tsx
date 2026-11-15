@@ -199,16 +199,18 @@ export default function MainLayout({
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="truncate text-sm leading-none font-medium">
-                      {user.name}
-                    </p>
-                    <p className="truncate text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="truncate text-sm leading-none font-medium">
+                        {user.name}
+                      </p>
+                      <p className="truncate text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
 
                 <DropdownMenuSeparator />
 
@@ -234,8 +236,8 @@ export default function MainLayout({
                 <DropdownMenuSeparator />
 
                 <DropdownMenuItem
+                  variant="destructive"
                   disabled={logoutMutation.isPending}
-                  className="text-destructive focus:text-destructive"
                   onClick={() => logoutMutation.mutate()}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
