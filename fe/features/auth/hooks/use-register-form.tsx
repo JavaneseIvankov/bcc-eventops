@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useRegister } from "@/shared/repository/queries"
 import type { RegisterInput } from "@/shared/repository/types"
 import { passwordSchema } from "./use-login-form"
+import { useRouter } from "next/navigation"
 
 const registerInputSchema = z.object({
   name: z
@@ -19,7 +20,12 @@ const registerInputSchema = z.object({
 export type TRegisterInputSchema = z.infer<typeof registerInputSchema>
 
 export const useRegisterForm = () => {
-  const registerMut = useRegister()
+   const router = useRouter()
+   const registerMut = useRegister({
+     onSuccess: () => {
+       router.push("/login")
+     },
+   })
 
   const form = useForm<TRegisterInputSchema>({
     resolver: zodResolver(registerInputSchema),

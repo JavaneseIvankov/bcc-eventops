@@ -36,7 +36,42 @@ import type {
 } from "./types"
 
 // ============================================================================
-// BETTER-FETCH INSTANCE (SERVER-SIDE DENGAN COOKIE FORWARDING)
+// AUTH TOKEN TYPES & COOKIE HELPER
+// ============================================================================
+
+interface AuthTokenData {
+  access_token: string
+  refresh_token: string
+}
+
+interface LoginResponseData extends AuthTokenData {
+  user: User
+}
+
+async function setAuthCookies(accessToken: string, refreshToken?: string) {
+  const cookieStore = await cookies()
+
+  cookieStore.set("access_token", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    sameSite: "lax",
+    maxAge: 60 * 30, // 30 menit
+  })
+
+  if (refreshToken) {
+    cookieStore.set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 hari
+    })
+  }
+}
+
+// ============================================================================
+// BETTER-FETCH INSTANCE (SERVER-SIDE DENGAN BEARER TOKEN)
 // ============================================================================
 
 const $fetch = createFetch({
@@ -46,47 +81,14 @@ const $fetch = createFetch({
     "http://localhost:8080/api/v1",
   throw: true,
   onRequest: async (context) => {
-    // Meneruskan HTTP-Only cookie (access_token & refresh_token) dari Browser -> Go Fiber
     const cookieStore = await cookies()
-    const cookieHeader = cookieStore.toString()
-    if (cookieHeader) {
-      context.headers.set("cookie", cookieHeader)
+    const accessToken = cookieStore.get("access_token")?.value
+
+    if (accessToken && !context.headers.has("Authorization")) {
+      context.headers.set("Authorization", `Bearer ${accessToken}`)
     }
+
     return context
-  },
-  onResponse: async ({ response }) => {
-    // Meneruskan Set-Cookie dari Go Fiber (saat login/register/refresh/logout) -> Browser
-    const setCookieHeaders =
-      typeof response.headers.getSetCookie === "function"
-        ? response.headers.getSetCookie()
-        : []
-
-    if (setCookieHeaders.length > 0) {
-      const cookieStore = await cookies()
-      for (const rawCookie of setCookieHeaders) {
-        const [nameValue, ...attrs] = rawCookie.split(";").map((s) => s.trim())
-        const eqIdx = nameValue.indexOf("=")
-        if (eqIdx === -1) continue
-
-        const name = nameValue.slice(0, eqIdx)
-        const value = nameValue.slice(eqIdx + 1)
-
-        const httpOnly = attrs.some((a) => a.toLowerCase() === "httponly")
-        const secure = attrs.some((a) => a.toLowerCase() === "secure")
-        const pathAttr = attrs.find((a) => a.toLowerCase().startsWith("path="))
-        const maxAgeAttr = attrs.find((a) =>
-          a.toLowerCase().startsWith("max-age=")
-        )
-
-        cookieStore.set(name, value, {
-          httpOnly,
-          secure,
-          path: pathAttr ? pathAttr.split("=")[1] : "/",
-          ...(maxAgeAttr ? { maxAge: Number(maxAgeAttr.split("=")[1]) } : {}),
-          sameSite: "lax",
-        })
-      }
-    }
   },
 })
 
@@ -102,22 +104,49 @@ export async function registerAction(body: RegisterInput) {
 }
 
 export async function loginAction(body: LoginInput) {
-  return $fetch<ApiResponse<User>>("/auth/login", {
+  const res = await $fetch<ApiResponse<LoginResponseData>>("/auth/login", {
     method: "POST",
     body,
   })
+
+  await setAuthCookies(res.data.access_token, res.data.refresh_token)
+
+  return { ...res, data: res.data.user } satisfies ApiResponse<User>
 }
 
 export async function refreshTokenAction() {
-  return $fetch<ApiResponse<null>>("/auth/refresh", {
+  const cookieStore = await cookies()
+  const refreshToken = cookieStore.get("refresh_token")?.value
+
+  const res = await $fetch<ApiResponse<AuthTokenData>>("/auth/refresh", {
     method: "POST",
+    body: { refresh_token: refreshToken },
   })
+
+  await setAuthCookies(res.data.access_token, res.data.refresh_token)
+
+  return { ...res, data: null } satisfies ApiResponse<null>
 }
 
 export async function logoutAction() {
-  return $fetch<ApiResponse<null>>("/auth/logout", {
-    method: "POST",
-  })
+  const cookieStore = await cookies()
+  const refreshToken = cookieStore.get("refresh_token")?.value
+
+  try {
+    await $fetch<ApiResponse<null>>("/auth/logout", {
+      method: "POST",
+      body: { refresh_token: refreshToken },
+    })
+  } finally {
+    cookieStore.delete("access_token")
+    cookieStore.delete("refresh_token")
+  }
+
+  return {
+    success: true,
+    message: "Logout berhasil",
+    data: null,
+  } satisfies ApiResponse<null>
 }
 
 export async function getMeAction() {
