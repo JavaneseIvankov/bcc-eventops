@@ -72,14 +72,8 @@ export interface Registration {
   qr_token: string;
   registered_at: string;
   checked_in_at: string | null;
-  event?: {
-    id: string;
-    name: string;
-    location: string;
-    start_time: string;
-    end_time: string;
-    status: EventStatus;
-  };
+  // Catatan: API `/me/registrations` TIDAK menyertakan objek event.
+  // Detail event di-join manual lewat `event_id` di `useMyRegistrationsWithEvents`.
 }
 
 export interface EventDetail extends EventSummary {

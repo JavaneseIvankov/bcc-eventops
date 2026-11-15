@@ -26,12 +26,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/shared/components/ui/alert-dialog"
-import {
-  useCancelMyRegistration,
-  useGetMyRegistrations,
-} from "@/shared/repository/queries"
+import { useCancelMyRegistration } from "@/shared/repository/queries"
 import type { Registration } from "@/shared/repository/types"
 import { formatDateTime } from "@/features/events/components/event-date"
+import { useMyTickets, type TicketWithEvent } from "../hooks/use-my-tickets"
 
 const REGISTRATION_META: Record<
   Registration["status"],
@@ -43,11 +41,11 @@ const REGISTRATION_META: Record<
 }
 
 export function MyTicketsTable() {
-  const { data, isLoading } = useGetMyRegistrations({ limit: 50 })
-  const [qrTicket, setQrTicket] = React.useState<Registration | null>(null)
+  const { tickets, isLoading } = useMyTickets()
+  const [qrTicket, setQrTicket] = React.useState<TicketWithEvent | null>(null)
   const cancelMut = useCancelMyRegistration()
 
-  const registrations = data?.data ?? []
+  const registrations = tickets
 
   if (isLoading) {
     return (
@@ -80,11 +78,11 @@ export function MyTicketsTable() {
   return (
     <>
       <div className="space-y-2">
-        {registrations.map((registration) => {
+        {registrations.map((ticket) => {
+          const { registration, event } = ticket
           const meta = REGISTRATION_META[registration.status]
           const canCancel =
-            registration.status === "REGISTERED" &&
-            registration.event?.status === "UPCOMING"
+            registration.status === "REGISTERED" && event?.status === "UPCOMING"
 
           return (
             <div
@@ -94,16 +92,16 @@ export function MyTicketsTable() {
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-medium">
-                    {registration.event?.name ?? "Event"}
+                    {event?.name ?? `Event ${registration.event_id?.slice(0, 8) ?? ""}`}
                   </p>
                   <Badge variant={meta.variant} className="h-5 px-1.5 text-[10px]">
                     {meta.label}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {registration.event?.location}
-                  {registration.event?.start_time &&
-                    ` · ${formatDateTime(registration.event.start_time)}`}
+                  {event?.location}
+                  {event?.start_time &&
+                    ` · ${formatDateTime(event.start_time)}`}
                 </p>
                 {registration.status === "CHECKED_IN" &&
                   registration.checked_in_at && (
@@ -117,7 +115,7 @@ export function MyTicketsTable() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setQrTicket(registration)}
+                  onClick={() => setQrTicket(ticket)}
                 >
                   <QrCode className="mr-1.5 h-3.5 w-3.5" />
                   Show QR
@@ -141,7 +139,7 @@ export function MyTicketsTable() {
                         <AlertDialogDescription>
                           Tiket kamu untuk{" "}
                           <span className="font-medium">
-                            {registration.event?.name}
+                            {event?.name ?? "event ini"}
                           </span>{" "}
                           akan dibatalkan dan kuota dikembalikan.
                         </AlertDialogDescription>
@@ -150,8 +148,8 @@ export function MyTicketsTable() {
                         <AlertDialogCancel>Batal</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => {
-                            if (registration.event?.id) {
-                              cancelMut.mutate(registration.event.id)
+                            if (registration.event_id) {
+                              cancelMut.mutate(registration.event_id)
                             }
                           }}
                         >
@@ -173,7 +171,10 @@ export function MyTicketsTable() {
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{qrTicket?.event?.name ?? "Tiket QR"}</DialogTitle>
+            <DialogTitle>
+              {qrTicket?.event?.name ??
+                `Tiket ${qrTicket?.registration.event_id?.slice(0, 8) ?? ""}`}
+            </DialogTitle>
             <DialogDescription>
               Tunjukkan QR ini ke panitia di meja check-in.
             </DialogDescription>
@@ -182,11 +183,11 @@ export function MyTicketsTable() {
           <div className="flex flex-col items-center gap-3 py-2">
             <div className="rounded-xl border bg-white p-4">
               {qrTicket && (
-                <QRCodeSVG value={qrTicket.qr_token} size={192} />
+                <QRCodeSVG value={qrTicket.registration.qr_token} size={192} />
               )}
             </div>
             <p className="max-w-full truncate rounded bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground">
-              {qrTicket?.qr_token}
+              {qrTicket?.registration.qr_token}
             </p>
           </div>
         </DialogContent>
