@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - "fe/**"
-      - "docker-compose.yml"
       - ".github/workflows/deploy-fe.yml"
 
   workflow_dispatch:
@@ -50,14 +49,16 @@ jobs:
             echo "=== Pull Latest Code ==="
             git pull origin main
 
+            cd fe
+
             # Build & restart frontend container
             echo "=== Build & Restart Frontend Container ==="
-            docker compose up -d --build fe
+            docker compose up -d --build
 
             # Check container status
             echo "=== Container Status ==="
-            docker compose ps fe
-            docker compose logs --tail 50 fe
+            docker compose ps
+            docker compose logs --tail 50
 
             echo "================================"
             echo "FRONTEND DEPLOYMENT SUCCESSFUL!"
